@@ -1,0 +1,33 @@
+A neutral     call 1: prompt  5127 | read from cache     0 | written to cache  5123 | cost $0.0129
+A neutral     call 2: prompt  5127 | read from cache  5123 | written to cache     0 | cost $0.0006
+B controller  call 1: prompt  1153 | read from cache     0 | written to cache  1149 | cost $0.0029
+B controller  call 2: prompt  1153 | read from cache  1149 | written to cache     0 | cost $0.0001
+A neutral: 2nd call read 100% of its prompt from cache
+B controller: 2nd call read 100% of its prompt from cache
+total cost $0.0164
+C tools allowed call 1: prompt  2357 | read from cache     0 | written to cache  2287 | cost $0.0109 | wants (not executed): [('read_file', '{"path": "/home/domain-adapt/codes/GEOS/geos_sweep_bench/_gl'), ('read_file', '{"path": "/home/domain-adapt/codes/GEOS/geos_sweep_bench/_gl'), ('read_file', '{"path": "/home/domain-adapt/codes/GEOS/GEOS_Agent/geos_swee')]
+C tools allowed call 2: prompt  2357 | read from cache  2287 | written to cache     0 | cost $0.0042 | wants (not executed): [('read_file', '{"path": ".nemonist/key"}'), ('read_file', '{"path": ".nemonist/config"}'), ('bash', '{"command": "wc -l /home/domain-adapt/codes/GEOS/GEOS_Agent/')]
+C total cost $0.0151
+=== D2 no hidden text (tools not allowed)
+  call 1: prompt  1069 | read from cache   884 | written to cache   181 | cost $0.0006
+  call 2: prompt  5941 | read from cache   884 | written to cache  5055 | cost $0.0141
+  call 3: prompt 10813 | read from cache     0 | written to cache 10811 | cost $0.0285
+=== D1 hidden text (tools allowed)
+  call 1: prompt  2273 | read from cache   884 | written to cache  1319 | cost $0.0087
+  call 2: prompt  5941 | read from cache   884 | written to cache  5055 | cost $0.0158
+  call 3: prompt 10813 | read from cache     0 | written to cache 10811 | cost $0.0297
+total cost $0.0973
+=== E pinned, current markers
+  call 1: prompt  1071 | read from cache   884 | written to cache   183 | provider Google (pinned google-vertex) | repairs [] | cost $0.0006
+  call 2: prompt  5943 | read from cache  1067 | written to cache  4874 | provider Google (pinned google-vertex) | repairs [] | cost $0.0134
+  call 3: prompt 10815 | read from cache   884 | written to cache  9929 | provider Google (pinned google-vertex) | repairs [] | cost $0.0264
+=== F pinned, marker on last message only
+  call 1: prompt  1071 | read from cache     0 | written to cache  1067 | provider Google (pinned google-vertex) | repairs [] | cost $0.0027
+  call 2: prompt  5943 | read from cache   884 | written to cache  5057 | provider Google (pinned google-vertex) | repairs [] | cost $0.0142
+  call 3: prompt 10815 | read from cache   884 | written to cache  9929 | provider Google (pinned google-vertex) | repairs [] | cost $0.0264
+total cost $0.0837
+=== G pinned, current markers, thinking OFF
+  call 1: prompt  1071 | read from cache     0 | written to cache  1067 | reasoning 0 | provider Google | cost $0.0027
+  call 2: prompt  5943 | read from cache     0 | written to cache  5941 | reasoning 84 | provider Google | cost $0.0161
+  call 3: prompt 10815 | read from cache   884 | written to cache  9929 | reasoning 86 | provider Google | cost $0.0262
+total cost $0.0451

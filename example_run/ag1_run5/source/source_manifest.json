@@ -1,0 +1,19 @@
+{
+ "files": [
+  {
+   "file": "DeviatedElasticWellbore_smoke.xml",
+   "original_path": "/home/domain-adapt/codes/GEOS/inputFiles/wellbore/DeviatedElasticWellbore_smoke.xml",
+   "sha256": "5b10563a24e47097e103948f01c1b797001a86841663b0e428b9f037bd2530d6",
+   "purpose": "top-level deck: mesh, solver",
+   "content": "model settings"
+  },
+  {
+   "file": "DeviatedElasticWellbore_base.xml",
+   "original_path": "/home/domain-adapt/codes/GEOS/inputFiles/wellbore/DeviatedElasticWellbore_base.xml",
+   "sha256": "943afdfb9ce1ec5194eccb0c1b6b597f08c94a9c49c4a2241b588d3e90c773dd",
+   "purpose": "included: events, material, BCs, outputs",
+   "content": "model settings"
+  }
+ ],
+ "data_files": []
+}

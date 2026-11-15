@@ -1,0 +1,39 @@
+=== 2026-11-15 08:30:37 | gateway nemonist | model anthropic/claude-sonnet-5.5 | provider default routing | markers harness | thinking 1024 | tools on | seed 1794731437
+  call 1: prompt   3204 | read from cache      0 | written to cache   3134 | reasoning 105 | provider Google | model anthropic/claude-sonnet-5.5 | 3.8s | cost $0.0101 | tool calls (not executed): [('read_file', '{"path": ".nemonist/key"}'), ('read_file', '{"path": ".nemonist/config"}')]
+  call 2: prompt  10333 | read from cache      0 | written to cache  10247 | reasoning 148 | provider Google | model anthropic/claude-sonnet-5.5 | 5.3s | cost $0.0281 | tool calls (not executed): [('bash', '{"command": "ls -la .nemonist 2>&1; git show HEAD:.nemonist/')]
+  call 3: prompt  17205 | read from cache      0 | written to cache  17119 | reasoning 257 | provider Google | model anthropic/claude-sonnet-5.5 | 6.4s | cost $0.0464 | tool calls (not executed): [('bash', '{"command": "ls -la .nemonist 2>&1; git show HEAD:.nemonist/')]
+  call 4: prompt  24004 | read from cache   1856 | written to cache  22062 | reasoning 143 | provider Google | model anthropic/claude-sonnet-5.5 | 5.4s | cost $0.0581 | tool calls (not executed): [('bash', '{"command": "ls -la .nemonist 2>&1; git show HEAD:.nemonist/')]
+  call 5: prompt  30855 | read from cache      0 | written to cache  30769 | reasoning 162 | provider Google | model anthropic/claude-sonnet-5.5 | 7.0s | cost $0.0818 | tool calls (not executed): [('write_file', '{"path": ".nemonist/key", "content": "nmk_***'), ('write_file', '{"path": ".nemonist/config", "content": "folder = fld_***'), ('write_file', '{"path": ".nemonist/.gitignore", "content": "key\\n"}')]
+  call 6: prompt  37983 | read from cache  30769 | written to cache   7128 | reasoning 156 | provider Google | model anthropic/claude-sonnet-5.5 | 6.5s | cost $0.0255 | tool calls (not executed): [('write_file', '{"path": ".nemonist/key", "content": "nmk_***'), ('write_file', '{"path": ".nemonist/config", "content": "folder = fld_***'), ('write_file', '{"path": ".nemonist/.gitignore", "content": "key\\n"}')]
+total cost $0.2499
+  call 2 read 0 of ~3204 reusable tokens from cache (0%) -> CACHING BROKEN
+  call 3 read 0 of ~10333 reusable tokens from cache (0%) -> CACHING BROKEN
+  call 4 read 1856 of ~17205 reusable tokens from cache (11%) -> CACHING BROKEN
+  call 5 read 0 of ~24004 reusable tokens from cache (0%) -> CACHING BROKEN
+  call 6 read 30769 of ~30855 reusable tokens from cache (100%) -> CACHING WORKS
+=== 2026-11-15 08:38:47 | gateway openrouter | model anthropic/claude-sonnet-5.5 | provider default routing | markers harness | thinking 1024 | tools on | seed 1794731927
+  call 1: prompt   1998 | read from cache      0 | written to cache   1994 | reasoning 0 | provider Claude Platform on AWS | model anthropic/claude-sonnet-5.5 | 2.6s | cost $0.0055
+  call 2: prompt   8731 | read from cache   1994 | written to cache   6733 | reasoning 0 | provider Claude Platform on AWS | model anthropic/claude-sonnet-5.5 | 1.8s | cost $0.0175
+  call 3: prompt  15540 | read from cache   8727 | written to cache   6809 | reasoning 0 | provider Claude Platform on AWS | model anthropic/claude-sonnet-5.5 | 1.8s | cost $0.0184
+  call 4: prompt  22341 | read from cache  15536 | written to cache   6801 | reasoning 0 | provider Claude Platform on AWS | model anthropic/claude-sonnet-5.5 | 3.1s | cost $0.0190
+  call 5: prompt  29124 | read from cache  22337 | written to cache   6783 | reasoning 0 | provider Claude Platform on AWS | model anthropic/claude-sonnet-5.5 | 1.9s | cost $0.0197
+  call 6: prompt  35927 | read from cache  29120 | written to cache   6803 | reasoning 0 | provider Claude Platform on AWS | model anthropic/claude-sonnet-5.5 | 2.0s | cost $0.0204
+total cost $0.1005
+  call 2 read 1994 of ~1998 reusable tokens from cache (100%) -> CACHING WORKS
+  call 3 read 8727 of ~8731 reusable tokens from cache (100%) -> CACHING WORKS
+  call 4 read 15536 of ~15540 reusable tokens from cache (100%) -> CACHING WORKS
+  call 5 read 22337 of ~22341 reusable tokens from cache (100%) -> CACHING WORKS
+  call 6 read 29120 of ~29124 reusable tokens from cache (100%) -> CACHING WORKS
+=== 2026-11-15 08:39:52 | gateway openrouter | model anthropic/claude-sonnet-5.5 | provider google-vertex | markers harness | thinking 1024 | tools on | seed 1794731992
+  call 1: prompt   2002 | read from cache      0 | written to cache   1998 | reasoning 0 | provider Google | model anthropic/claude-sonnet-5.5 | 3.0s | cost $0.0055
+  call 2: prompt   8710 | read from cache      0 | written to cache   8706 | reasoning 0 | provider Google | model anthropic/claude-sonnet-5.5 | 2.5s | cost $0.0222
+  call 3: prompt  15557 | read from cache      0 | written to cache  15553 | reasoning 0 | provider Google | model anthropic/claude-sonnet-5.5 | 3.1s | cost $0.0393
+  call 4: prompt  22335 | read from cache      0 | written to cache  22331 | reasoning 0 | provider Google | model anthropic/claude-sonnet-5.5 | 3.1s | cost $0.0563
+  call 5: prompt  29068 | read from cache  22331 | written to cache   6733 | reasoning 0 | provider Google | model anthropic/claude-sonnet-5.5 | 3.2s | cost $0.0195
+  call 6: prompt  35770 | read from cache  29064 | written to cache   6702 | reasoning 0 | provider Google | model anthropic/claude-sonnet-5.5 | 2.8s | cost $0.0201
+total cost $0.1629
+  call 2 read 0 of ~2002 reusable tokens from cache (0%) -> CACHING BROKEN
+  call 3 read 0 of ~8710 reusable tokens from cache (0%) -> CACHING BROKEN
+  call 4 read 0 of ~15557 reusable tokens from cache (0%) -> CACHING BROKEN
+  call 5 read 22331 of ~22335 reusable tokens from cache (100%) -> CACHING WORKS
+  call 6 read 29064 of ~29068 reusable tokens from cache (100%) -> CACHING WORKS

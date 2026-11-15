@@ -1,0 +1,6 @@
+# Python 3.8+ (standard library) plus:
+numpy
+h5py
+# System tools (not pip): bubblewrap (bwrap) >= 0.8, tmux, git, and a GEOS build (geosx + its MPI).
+# On our server all of this lives in the conda env "geos":  conda install -c conda-forge bubblewrap numpy h5py
+# The caching_tests/ scripts need only Python 3 (no packages, no GEOS).

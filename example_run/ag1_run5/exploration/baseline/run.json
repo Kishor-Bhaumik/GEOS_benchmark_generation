@@ -1,0 +1,22 @@
+{
+ "run_id": "baseline",
+ "params": {},
+ "command": "/home/domain-adapt/codes/GEOS/build-conda-geos-release/bin/geosx -i /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/input.xml -o /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/output",
+ "cwd": "/home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline",
+ "start_time": "2026-11-15T03:53:43.194402+00:00",
+ "end_time": "2026-11-15T03:53:44.761312+00:00",
+ "wall_time_s": 1.567,
+ "exit_code": 0,
+ "success": true,
+ "input_sha256": "5b10563a24e47097e103948f01c1b797001a86841663b0e428b9f037bd2530d6",
+ "output_dir": "/home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/output",
+ "first_error": null,
+ "solver_statistics": {
+  "Time steps": 1.0,
+  "Time step cuts": 0.0,
+  "Successful nonlinear iterations": 1.0,
+  "Successful linear iterations": 1.0,
+  "Discarded nonlinear iterations": 0.0,
+  "Discarded linear iterations": 0.0
+ }
+}

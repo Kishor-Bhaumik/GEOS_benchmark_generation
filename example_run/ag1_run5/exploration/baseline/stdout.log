@@ -1,0 +1,148 @@
+Num ranks: 1
+GEOS version: 1.1.0 (develop, sha1: 04701ec63d)
+  - C++ compiler: gcc 15.2.0
+  - MPI version: Open MPI v5.0.10, package: Open MPI conda@9ee00b64ad27 Distribution, ident: 5.0.10, repo rev: v5.0.10, Feb 23, 2026
+  - HDF5 version: 1.12.1
+  - Conduit version: 0.9.5
+  - VTK version: 9.4.2
+  - RAJA version: 2025.12.0
+  - Umpire version: 2025.12.0
+  - CHAI version: 2025.12.0
+  - METIS version: 5.1
+  - PARMETIS version: 4.0
+  - SuperLU_Dist version: 6.3.0
+  - SuiteSparse version: 5.7.9
+  - hypre version: 3.1.0
+  - Python3 version: 3.14.6
+Started at 2026-11-15 03:53:43.329552339
+Opened XML file: /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/input.xml
+Included additional XML file: /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/DeviatedElasticWellbore_base.xml
+Mesh: adding InternalWellbore mesh1
+Solvers: adding SolidMechanicsLagrangianFEM lagsolve
+Events: adding PeriodicEvent solverApplications
+Events: adding PeriodicEvent outputs
+Events: adding PeriodicEvent restarts
+FiniteElements: adding FiniteElementSpace FE1
+FieldSpecifications: adding FieldSpecification xConstraint
+FieldSpecifications: adding FieldSpecification yConstraint
+FieldSpecifications: adding FieldSpecification zconstraint
+FieldSpecifications: adding Traction innerPressure
+Outputs: adding Silo siloOutput
+Outputs: adding Restart restartOutput
+Constitutive: adding ElasticIsotropic shale
+ElementRegions: adding CellElementRegion Omega
+Radial elements: { 4 }
+Radial coordinates: { 0.1, 0.214063, 0.452891, 0.952955, 2 }
+
+####################################################################################################
+##                                        Mesh generation                                         ##
+####################################################################################################
+
+mesh1: total number of nodes = 75
+mesh1: total number of elems = 32
+MPI Partitioning information:
+
+--------------------------------------------------------------------------------------------------------------------
+|                                           Mesh partitioning over ranks                                           |
+|------------------------------------------------------------------------------------------------------------------|
+|      Ranks       |         Nodes         |         Edges         |         Faces         |         Elems         |
+|------------------|-----------------------|-----------------------|-----------------------|-----------------------|
+|                  | Local | Ghost | Total | Local | Ghost | Total | Local | Ghost | Total | Local | Ghost | Total |
+|------------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+|                0 |    75 |     0 |    75 |   170 |     0 |   170 |   128 |     0 |   128 |    32 |     0 |    32 |
+|------------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+|              sum |    75 |     0 |    75 |   170 |     0 |   170 |   128 |     0 |   128 |    32 |     0 |    32 |
+|              min |    75 |     0 |    75 |   170 |     0 |   170 |   128 |     0 |   128 |    32 |     0 |    32 |
+|              max |    75 |     0 |    75 |   170 |     0 |   170 |   128 |     0 |   128 |    32 |     0 |    32 |
+|------------------|-----------------------|-----------------------|-----------------------|-----------------------|
+| min(local/total) |                     1 |                     1 |                     1 |                     1 |
+| max(local/total) |                     1 |                     1 |                     1 |                     1 |
+--------------------------------------------------------------------------------------------------------------------
+
+
+##                                     End of Mesh generation                                     ##
+####################################################################################################
+
+
+####################################################################################################
+##                                       Numerical Methods                                        ##
+####################################################################################################
+
+meshBodyName/meshLevelName/regionName/subRegionName = mesh1/Level0/Omega/cb1, 8 quadrature points
+  ConstitutiveModels/shale allocated
+
+##                                    End of Numerical Methods                                    ##
+####################################################################################################
+
+
+####################################################################################################
+##                                         Import fields                                          ##
+####################################################################################################
+
+mesh1: importing field data from mesh dataset
+  mesh level = Level0
+  volumic fields on Omega/cb1
+  mesh level = FE1
+  volumic fields on Omega/cb1
+
+##                                      End of Import fields                                      ##
+####################################################################################################
+
+ElasticIsotropic 'shale': per-cell E/nu conversion — 32 converted, 0 skipped (invalid E), 0 skipped (invalid nu), 0 with negative nu.
+Time: 0.00e+00 s, dt: 1 s, Cycle: 0
+
+####################################################################################################
+##                                            TIMESTEP                                            ##
+####################################################################################################
+##  - Time        : 00h00m00s out of 00h00m01s (0% completed)                                     ##
+##                  0 s / 1 s                                                                     ##
+##  - Delta Time  : 00h00m01s (1 s)                                                               ##
+##  - Cycle       : 0                                                                             ##
+
+
+-------------------------------------------------------
+|     The summary of declared fields and coupling     |
+|-----------------------------------------------------|
+|     |        name         |  comp  |  N global DOF  |
+|-----|---------------------|--------|----------------|
+|  0  |  totalDisplacement  |     3  |           225  |
+-------------------------------------------------------
+
+
+##  - Cycle        : 0                                                                            ##
+##  - N substeps   : 1                                                                            ##
+##  - substep dts  : 1 s                                                                          ##
+####################################################################################################
+##                                        End of TIMESTEP                                         ##
+####################################################################################################
+
+Rank 0: Writing out restart file at /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/output/input_restart_000000000/rank_0000000.hdf5
+Cleaning up events
+
+-----------------------------------------------
+|                  lagsolve                   |
+|---------------------------------------------|
+|            Statistics             |  Value  |
+|-----------------------------------|---------|
+|                       Time steps  |      1  |
+|                   Time step cuts  |      0  |
+|  Successful nonlinear iterations  |      1  |
+|     Successful linear iterations  |      1  |
+|   Discarded nonlinear iterations  |      0  |
+|      Discarded linear iterations  |      0  |
+-----------------------------------------------
+
+Rank 0: Writing out restart file at /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/output/input_restart_000000001/rank_0000000.hdf5
+
+----------------------------------------------------------------------------------------------------------------------------------
+| Umpire Memory Pool | Min reserved rank memory | Max reserved rank memory | Avg reserved rank memory | Sum reserved rank memory |
+|--------------------|--------------------------|--------------------------|--------------------------|--------------------------|
+|                    |   bytes   |  over total  |   bytes   |  over total  |   bytes   |  over total  |   bytes   |  over total  |
+|--------------------|-----------|--------------|-----------|--------------|-----------|--------------|-----------|--------------|
+|               HOST |    1.1 MB |        0.0 % |    1.1 MB |        0.0 % |    1.1 MB |        0.0 % |    1.1 MB |        0.0 % |
+----------------------------------------------------------------------------------------------------------------------------------
+
+Finished at 2026-11-15 03:53:44.717147733
+total time            00h00m01s (1.387595394 s)
+initialization time   00h00m00s (0.008991594 s)
+run time              00h00m00s (0.175605726 s)

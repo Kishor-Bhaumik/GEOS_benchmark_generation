@@ -1,0 +1,16 @@
+key before: usage $0.130266088, limit None
+=== 1 default routing (same as Nemonist test)
+  call 1: prompt  1073 | read from cache     0 | written to cache  1069 | provider Claude Platform on AWS | cost $0.0027
+  call 2: prompt  5945 | read from cache  1069 | written to cache  4874 | provider Claude Platform on AWS | cost $0.0139
+  call 3: prompt 10817 | read from cache  5943 | written to cache  4872 | provider Claude Platform on AWS | cost $0.0143
+=== 2 pinned to Anthropic
+  call 1: prompt  1073 | read from cache     0 | written to cache  1069 | provider Anthropic | cost $0.0027
+  call 2: prompt  5945 | read from cache  1069 | written to cache  4874 | provider Anthropic | cost $0.0134
+  call 3: prompt 10817 | read from cache  5943 | written to cache  4872 | provider Anthropic | cost $0.0147
+total cost $0.0616
+key after: usage $0.146832488, limit None
+=== 3 OpenRouter pinned to Google Vertex
+  call 1: prompt  1075 | read from cache     0 | written to cache  1071 | provider Google | cost $0.0027
+  call 2: prompt  5947 | read from cache     0 | written to cache  5945 | provider Google | cost $0.0163
+  call 3: prompt 10819 | read from cache     0 | written to cache 10817 | provider Google | cost $0.0288
+total cost $0.0479

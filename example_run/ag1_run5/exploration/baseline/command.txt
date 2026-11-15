@@ -1,0 +1,1 @@
+/home/domain-adapt/codes/GEOS/build-conda-geos-release/bin/geosx -i /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/input.xml -o /home/domain-adapt/codes/GEOS/geos_sweep_bench/decks/DeviatedElasticWellbore_smoke__5b10563a/ag1_run5/exploration/baseline/output

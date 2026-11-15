@@ -1,0 +1,15 @@
+# run outputs (created by the harness)
+bench/decks/
+bench/_global/controller_logs/
+bench/_global/generator_memory/
+bench/_global/agent_workspaces/
+bench/_global/spend_ledger.jsonl
+
+# Nemonist memory key files, API key files
+.nemonist/
+*.env
+env
+
+# Python
+__pycache__/
+*.pyc
