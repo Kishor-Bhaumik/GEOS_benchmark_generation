@@ -3,7 +3,7 @@
 
 Reproduces the caching tests behind evidence_caching/*.txt. No dependency on the QA harness: standard
 library only. Requests are built the same way as the harness (qa_llm.py): cache_control on the system prompt
-and on the last two user/tool messages, thinking as reasoning={"max_tokens": N}, provider pinned without
+and on the newest message, thinking as reasoning={"max_tokens": N}, provider pinned without
 fallbacks, earlier thinking never sent back.
 
 Modes
@@ -89,8 +89,9 @@ def mark(m):
 
 
 def with_markers(messages, style):
-    """harness: system + last two user/tool messages (same as qa_llm._with_cache_control);
-    last: last message only; none: no cache_control at all."""
+    """harness: system + newest message (same as qa_llm._with_cache_control since 2026-11-16);
+    two: system + last two user/tool messages (the harness before); last: newest message only;
+    none: no cache_control at all."""
     msgs = copy.deepcopy(messages)
     if style == 'none':
         return msgs
@@ -99,13 +100,16 @@ def with_markers(messages, style):
         return msgs
     if msgs and msgs[0].get('role') == 'system':
         mark(msgs[0])
-    marked = 0
-    for m in reversed(msgs[1:]):
-        if m.get('role') in ('user', 'tool'):
-            mark(m)
-            marked += 1
-            if marked == 2:
-                break
+    if style == 'two':
+        marked = 0
+        for m in reversed(msgs[1:]):
+            if m.get('role') in ('user', 'tool'):
+                mark(m)
+                marked += 1
+                if marked == 2:
+                    break
+    elif len(msgs) > 1:
+        mark(msgs[-1])
     return msgs
 
 
@@ -133,7 +137,7 @@ def main():
     ap.add_argument('--mode', choices=['grow', 'same'], default='grow')
     ap.add_argument('--calls', type=int, default=3, help='number of calls in grow mode (default 3)')
     ap.add_argument('--turn-words', type=int, default=2200, help='notes words per call (default 2200, about 5k tokens)')
-    ap.add_argument('--markers', choices=['harness', 'last', 'none'], default='harness')
+    ap.add_argument('--markers', choices=['harness', 'two', 'last', 'none'], default='harness')
     ap.add_argument('--thinking', type=int, default=1024, help='reasoning.max_tokens; 0 = thinking off')
     ap.add_argument('--answer-tokens', type=int, default=300)
     ap.add_argument('--tools', action='store_true', help='send bash/read_file/write_file tool definitions '
@@ -239,13 +243,18 @@ def main():
         say('dry run: no API call made')
         return
     say('total cost $%.4f' % total)
-    # verdict: with working prefix caching, call k reads about the whole prompt of call k-1
+    # verdict: call k can reuse what call k-1 sent (grow) or its own identical prompt (same); a call can read
+    # more than that (an entry written elsewhere), so the overall share is capped at 100% of the reusable part
+    got = want_sum = 0
     for k in range(1, len(rows)):
-        prev_prompt, (_, cached) = rows[k - 1][0], rows[k]
-        want = prev_prompt if a.mode == 'grow' else rows[k][0]
-        share = cached / want if want else 0
-        say('  call %d read %d of ~%d reusable tokens from cache (%.0f%%) -> %s' % (
-            k + 1, cached, want, 100 * share, 'CACHING WORKS' if share >= 0.8 else 'CACHING BROKEN'))
+        (prev_prompt, _), (prompt, cached) = rows[k - 1], rows[k]
+        want = min(prev_prompt, prompt) if a.mode == 'grow' else prompt
+        got, want_sum = got + min(cached, want), want_sum + want
+        say('  call %d read %d of its %d prompt tokens from cache (%.0f%%; reusable ~%d) -> %s' % (
+            k + 1, cached, prompt, 100.0 * cached / prompt if prompt else 0, want,
+            'CACHING WORKS' if cached >= 0.8 * want else 'CACHING BROKEN'))
+    if want_sum:
+        say('overall: %.0f%% of reusable tokens read from cache' % (100.0 * got / want_sum))
     if out:
         out.close()
 

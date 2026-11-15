@@ -12,7 +12,7 @@ Section 3.1 of GEOS_SWEEP_BENCH_AGENT_v1.md.
   HTTP 401/402/429 persisting after the retry raises UsageLimit (callers exit 75).
 - thinking is requested as reasoning={"max_tokens": REASONING_MAX_TOKENS} (0 = off; then REASONING_EFFORT, if set,
   is sent as reasoning_effort), with max_tokens = REASONING_MAX_TOKENS + MAX_ANSWER_TOKENS.
-- for anthropic/* models, cache_control marks the system prompt and the last message (prefix caching);
+- for anthropic/* models, cache_control marks the system prompt and the newest message (prefix caching);
   if the gateway rejects that (HTTP 400), the call is repeated once without it and caching is switched off.
 
 Offline testing: QA_LLM_MOCK=/path/mock.py whose respond(model, messages, tools, **kw) returns a
@@ -80,15 +80,10 @@ def _with_cache_control(messages):
             c[-1]['cache_control'] = {'type': 'ephemeral'}
     if msgs and msgs[0].get('role') == 'system':
         mark(msgs[0])
-    # cache breakpoints on the last two user/tool messages: the newest one writes the cache, the one before
-    # it matches what the previous call wrote (at most 4 breakpoints in total)
-    marked = 0
-    for m in reversed(msgs[1:]):
-        if m.get('role') in ('user', 'tool'):
-            mark(m)
-            marked += 1
-            if marked == 2:
-                break
+    # one more cache breakpoint, on the newest message only (advisor's test 2026-11-16: fewer misses on
+    # Google Vertex than marking the last two user/tool messages)
+    if len(msgs) > 1:
+        mark(msgs[-1])
     return msgs
 
 

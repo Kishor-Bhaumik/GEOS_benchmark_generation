@@ -73,16 +73,20 @@ def notes(turn, n_words, seed):
                      for i in range(0, n_words, 15))
 
 
-def with_markers(messages):
-    """cache_control on the system prompt and the last two user/tool messages (same as the QA harness)."""
+def with_markers(messages, old=False):
+    """cache_control on the system prompt and the newest message (same as the QA harness).
+    old=True: system prompt + last two user/tool messages (the harness before 2026-11-16)."""
     msgs = json.loads(json.dumps(messages))
 
     def mark(m):
         if isinstance(m.get('content'), str) and m['content']:
             m['content'] = [{'type': 'text', 'text': m['content'], 'cache_control': {'type': 'ephemeral'}}]
     mark(msgs[0])
-    for m in [m for m in msgs[1:] if m['role'] in ('user', 'tool')][-2:]:
-        mark(m)
+    if old:
+        for m in [m for m in msgs[1:] if m['role'] in ('user', 'tool')][-2:]:
+            mark(m)
+    else:
+        mark(msgs[-1])
     return msgs
 
 
@@ -107,6 +111,8 @@ def main():
     ap.add_argument('--model', default='anthropic/claude-sonnet-5.5')
     ap.add_argument('--provider', help='pin to one provider, no fallbacks: e.g. anthropic, google-vertex, '
                                        'amazon-bedrock (default: gateway routing)')
+    ap.add_argument('--old-markers', action='store_true', help='mark the last two user/tool messages instead of '
+                    'only the newest one (the harness before 2026-11-16), for comparison')
     a = ap.parse_args()
 
     key = NEMONIST_KEY if a.gateway == 'nemonist' else OPENROUTER_KEY
@@ -115,15 +121,15 @@ def main():
                  % (a.gateway, 'NEMONIST_KEY' if a.gateway == 'nemonist' else 'OPENROUTER_KEY'))
     base, seed = GATEWAYS[a.gateway], int(time.time())   # new seed: never reuses an earlier run's cache
 
-    print('=== %s | gateway %s | model %s | provider %s | tools on' % (
-        time.strftime('%Y-%m-%d %H:%M:%S'), a.gateway, a.model, a.provider or 'default routing'))
+    print('=== %s | gateway %s | model %s | provider %s | markers %s | tools on' % (
+        time.strftime('%Y-%m-%d %H:%M:%S'), a.gateway, a.model, a.provider or 'default routing', 'old (last two)' if a.old_markers else 'newest only'))
     messages = [{'role': 'system', 'content': SYSTEM}]
     rows, total = [], 0.0
     for k in range(1, CALLS + 1):
         text = notes(k, 15 if k == 1 else 2200, seed)
         messages.append({'role': 'user', 'content': 'Project notes, part %d:\n%s\n\nIn one sentence: which word '
                          'appears first in part %d?' % (k, text, k)})
-        body = {'model': a.model, 'messages': with_markers(messages), 'tools': TOOLS,
+        body = {'model': a.model, 'messages': with_markers(messages, a.old_markers), 'tools': TOOLS,
                 'reasoning': {'max_tokens': THINKING_TOKENS}, 'max_tokens': THINKING_TOKENS + ANSWER_TOKENS}
         if a.provider:
             body['provider'] = {'order': [a.provider], 'allow_fallbacks': False}
@@ -158,14 +164,18 @@ def main():
             messages.append({'role': 'tool', 'tool_call_id': t['id'], 'content': '(not executed in this test)'})
 
     print('total cost $%.4f' % total)
+    # reusable = the part of call k's prompt that call k-1 already sent (its whole prompt); a call can also
+    # read more than that (a cache entry written elsewhere), so the share is capped at 100% of the reusable part
+    got = want_sum = 0
     for k in range(1, len(rows)):
-        want, cached = rows[k - 1][0], rows[k][1]
-        share = cached / want if want else 0
-        print('  call %d read %d of ~%d reusable tokens from cache (%.0f%%) -> %s' % (
-            k + 1, cached, want, 100 * share, 'CACHING WORKS' if share >= 0.8 else 'CACHING BROKEN'))
-    if len(rows) > 1:
-        reusable = sum(r[0] for r in rows[:-1])
-        print('overall: %.0f%% of reusable tokens read from cache' % (100 * sum(r[1] for r in rows[1:]) / reusable))
+        (prev_prompt, _), (prompt, cached) = rows[k - 1], rows[k]
+        want = min(prev_prompt, prompt)
+        got, want_sum = got + min(cached, want), want_sum + want
+        print('  call %d read %d of its %d prompt tokens from cache (%.0f%%; reusable ~%d) -> %s' % (
+            k + 1, cached, prompt, 100.0 * cached / prompt if prompt else 0, want,
+            'CACHING WORKS' if cached >= 0.8 * want else 'CACHING BROKEN'))
+    if want_sum:
+        print('overall: %.0f%% of reusable tokens read from cache' % (100.0 * got / want_sum))
 
 
 if __name__ == '__main__':

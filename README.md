@@ -102,24 +102,25 @@ Results are written to `bench/decks/<deck>__<hash>/<RUN_TAG>/` (git-ignored).
   recorded per call in `usage.jsonl`.
 - Expected calls per attempt: generator ~100–200, no-tool 4, agent ~30–80 per shuffle.
 
-## Known issue: prompt caching on the Google Vertex route
+## Prompt caching
 
-The generator is a long multi-turn session, with prompts up to ~55k tokens. Without prompt caching, it
-pays the full input price for the whole history on every call. In `example_run/ag1_run5` (Nemonist, served
-by Google), only **781 tokens** were read from cache on nearly every one of 44 calls, and the attempt was
-stopped because the cost kept climbing.
+The generator is a long multi-turn session, with prompts up to ~55k tokens, so it depends on prompt caching.
+In `example_run/ag1_run5` (Nemonist, served by Google Vertex), only **781 tokens** were read from cache on nearly
+every one of 44 calls.
 
-The harness marks the system prompt and the last two user/tool messages with `cache_control`, and earlier
-thinking is never sent back.
+**Cause (found by Nemonist, fixed 2026-11-16):** when the model looked for a missing `.nemonist/key`,
+Nemonist added a note to the system prompt that carried a new key on every request. The system prompt
+therefore changed on every call, and nothing after it could be cached. Now the note stays the same within a
+conversation: it changes once (call 1 to call 2) and is then identical.
 
-Tests (6-call growing conversation; all results in `caching_tests/results/`):
+**Still open:** Google Vertex sometimes doesn't reuse a cache entry written a second earlier. This is seen
+on OpenRouter pinned to `google-vertex` too, so it can't be fixed by the gateway. Nemonist serves Claude Sonnet
+only through Vertex (zero-data-retention account). AWS/Anthropic (e.g. OpenRouter default routing) cached
+every call in our tests.
 
-| | Google via Nemonist | Google via OpenRouter | AWS via OpenRouter |
-|---|---|---|---|
-| no tools | 91% cached | 82% cached | 100% |
-| with tools | 66% (calls 2–4 miss) | 69% (calls 2–4 miss) | 100% |
-
-The misses follow the provider (Google Vertex), not the gateway. AWS/Anthropic cached every call.
+**Cache markers:** since 2026-11-16, the harness marks only the **system prompt and the newest message** with
+`cache_control`; before, it marked the last two user/tool messages. In Nemonist's tests, this gave fewer
+misses on Vertex. Earlier thinking is never sent back.
 
 ### Reproducing it (any machine; Python 3 only, no GEOS)
 
@@ -130,14 +131,14 @@ agent): put your keys in the two strings at the top (`NEMONIST_KEY = ""`, `OPENR
 python3 caching_tests/caching_tools_check.py --gateway nemonist
 python3 caching_tests/caching_tools_check.py --gateway openrouter
 python3 caching_tests/caching_tools_check.py --gateway openrouter --provider google-vertex
-python3 caching_tests/caching_tools_check.py --gateway nemonist --provider anthropic
+python3 caching_tests/caching_tools_check.py --gateway nemonist --old-markers    # marker placement before 2026-11-16
 ```
 
 Each run costs about $0.10–0.20. `--model` changes the model, and `--provider` pins one provider with no
 fallbacks. The scripts make no tool calls: every tool request is answered "(not executed in this test)".
 
 `caching_tests/caching_multiturn_test.py` is the same test with more switches (`--tools`, `--thinking`,
-`--markers`, `--mode same|grow`, `--calls`, `--dry-run`). It reads the keys from `NEMONIST_API_KEY` /
+`--markers harness|two|last|none`, `--mode same|grow`, `--calls`, `--dry-run`). It reads the keys from `NEMONIST_API_KEY` /
 `OPENROUTER_API_KEY`. Use `--dry-run` to print the exact request bodies without calling the API.
 
 ## Other notes
@@ -149,7 +150,8 @@ fallbacks. The scripts make no tool calls: every tool request is answered "(not 
 - **Nemonist memory:** when tools are present, Nemonist adds ~1,200 hidden prompt tokens that tell the model to
   read/write `.nemonist/key` and `.nemonist/config`. The generator's working folder
   (`bench/_global/generator_memory/`) persists across attempts, while each agent session gets a fresh, empty
-  `/work` that is deleted afterwards. Caching tests show this injected text is not the cause of the cache misses.
+  `/work` that is deleted afterwards. Once the generator creates `.nemonist/key` in its folder (following
+  the note), the note no longer appears for it.
 - **Sandbox:** the agent's root is a tmpfs. System folders are read-only, `$HOME` is hidden except `GEOS_ROOT`,
   conda and `AGENT_RO_BINDS`, and `BENCH_DIR` plus every untracked GEOS path (except the build) is hidden.
   `/tmp` is private (MPI needs it). The agent cap on GEOS runs is soft (a counting wrapper).
