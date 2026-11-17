@@ -33,6 +33,7 @@ import copy
 import json
 import os
 import random
+import re
 import sys
 import time
 import urllib.error
@@ -69,6 +70,10 @@ TOOLS = [
                                                         'content': {'type': 'string'}},
                        'required': ['path', 'content']}}},
 ]
+
+
+# Nemonist memory keys/folders may appear in tool-call arguments or errors: never print them
+SECRET = re.compile(r'\b(nmk|fld)_[A-Za-z0-9]+')
 
 
 def filler(turn, n_words, seed):
@@ -204,7 +209,7 @@ def main():
         try:
             resp = post(base, key, body)
         except urllib.error.HTTPError as e:
-            say('call %d: HTTP %d: %s' % (k, e.code, e.read().decode()[:800]))
+            say('call %d: HTTP %d: %s' % (k, e.code, SECRET.sub(r'\1_***', e.read().decode()[:800])))
             break
         except Exception as e:
             say('call %d: %s: %s' % (k, type(e).__name__, e))
@@ -223,7 +228,7 @@ def main():
             'model %s | %.1fs | cost %s%s' % (
                 k, prompt, cached, written, ctd.get('reasoning_tokens'), resp.get('provider'),
                 resp.get('model'), time.time() - t0, '$%.4f' % c if c is not None else 'NOT REPORTED',
-                ' | tool calls (not executed): %s' % [(t['function']['name'], t['function']['arguments'][:60])
+                ' | tool calls (not executed): %s' % [(t['function']['name'], SECRET.sub(r'\1_***', t['function']['arguments'] or '')[:60])
                                                        for t in calls] if calls else ''))
 
         # earlier thinking is never sent back (same as the harness)

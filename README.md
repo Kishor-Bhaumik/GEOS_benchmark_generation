@@ -41,6 +41,7 @@ bench/                           BENCH_DIR (default): harness + results
     qa_eval.py                   no-tool and agent evaluation, scoring, memory entry
     qa_sweep.py                  reads sweep / refinement points
     qa_common.py                 config, prompt blocks from the protocol, pricing, spend ledger
+    qa_screen_infer.py           screens the sweep table for infer_then_predict (A, B) pairs in one command
     tests/                       offline mock of the gateway (no API key used)
   _global/scripts/check_mesh_description.py   mesh-description helper used by the controller
 caching_tests/                   standalone prompt-caching tests (no GEOS needed), see below
@@ -102,6 +103,25 @@ Results are written to `bench/decks/<deck>__<hash>/<RUN_TAG>/` (git-ignored).
   recorded per call in `usage.jsonl`.
 - Expected calls per attempt: generator ~100–200, no-tool 4, agent ~30–80 per shuffle.
 
+## Status and recent changes
+
+- **First KEPT question (2026-11-17, `ag1_run8`, $1.60 in total):** the no-tool model was wrong 4/4 and the agent
+  right 4/4. Note: the agent did not run GEOS. It rebuilt the fully specified 75-node mesh and solved it with its
+  own Python finite-element code.
+- **Thinking cap:** `REASONING_MAX_TOKENS=2000` cut the generator cost from $4.06 to $1.16 on the same deck.
+  The cap applies to every role. `reasoning.effort` is only a hint (Sonnet 5.5 does not think at "low"), so
+  `max_tokens` is used as the hard cap (`caching_tests/effort_check.py`).
+- **Protocol Section 3.5:** copy-paste commands for every helper script, so the generator does not read the
+  scripts' code. `qa_screen_infer.py` screens all (A, B) pairs of the sweep table at once.
+- **MCQ:** `qa_build_mcq.py --placement above|below|straddle` (the controller's choice), so the true value is
+  not always the middle option. The four shuffles are always distinct.
+- **Next attempt after TOO_EASY:** the controller reads the no-tool answers themselves (Section 3.5, A4).
+- **Streaming:** API calls stream by default (`QA_STREAM=1`). `STREAM_IDLE_S` (120) seconds without data is
+  treated as a dead connection and retried. Before this, a reply lost in transit made the client wait for the
+  whole 30-minute timeout.
+- **Fallbacks:** a cache-related HTTP 400 disables cache markers only for that call. Repair errors are saved in
+  `usage.jsonl` as `repair_errors`.
+
 ## Prompt caching
 
 The generator is a long multi-turn session, with prompts up to ~55k tokens, so it depends on prompt caching.
@@ -117,6 +137,11 @@ conversation: it changes once (call 1 to call 2) and is then identical.
 on OpenRouter pinned to `google-vertex` too, so it can't be fixed by the gateway. Nemonist serves Claude Sonnet
 only through Vertex (zero-data-retention account). AWS/Anthropic (e.g. OpenRouter default routing) cached
 every call in our tests.
+
+**"Found 5" (fixed by Nemonist, 2026-11-16):** Nemonist kept old cache marks from its own copy of earlier
+messages, so a request could reach the provider with more than 4 blocks, even with none from us. Nemonist
+also adds one mark when a Claude request has none. Evidence and tests: `caching_tests/results/evidence_found5.txt`,
+`markers_check.py`, `markers_repro.py`.
 
 **Cache markers:** since 2026-11-16, the harness marks only the **system prompt and the newest message** with
 `cache_control`; before, it marked the last two user/tool messages. In Nemonist's tests, this gave fewer

@@ -1,6 +1,7 @@
 """Build the MCQ of one attempt (Section 9): distractors from the sweep, options, shuffles -> question/mcq.json.
 
-  python qa_build_mcq.py --attempt-dir <deck>/<RUN_TAG>/attempt_<n> --d-min-pct 3 --d-max-pct 12 --reason "..."
+  python qa_build_mcq.py --attempt-dir <deck>/<RUN_TAG>/attempt_<n> --d-min-pct 3 --d-max-pct 12 --reason "..." \
+        --placement above|below|straddle
         [--n-shuffles 4] [--max-pct 25]
 
 Prints the options and the distractors' provenance, never the letter keys.
@@ -85,6 +86,9 @@ def main():
     ap.add_argument('--d-min-pct', type=float, required=True)
     ap.add_argument('--d-max-pct', type=float, required=True)
     ap.add_argument('--reason', required=True)
+    ap.add_argument('--placement', required=True, choices=('above', 'below', 'straddle'),
+                    help='where the two distractors lie relative to the true value: both above, both below, '
+                         'or one on each side (the controller chooses; Section 9.3)')
     ap.add_argument('--n-shuffles', type=int, default=int(os.environ.get('N_SHUFFLES', 4)))
     ap.add_argument('--max-pct', type=float, default=float(os.environ.get('DISTRACTOR_MAX_PCT', 25)))
     ap.add_argument('--allow-random', action='store_true')
@@ -151,23 +155,27 @@ def main():
         if f not in seen:
             seen.add(f)
             uniq.append((v, d))
+    # the placement the controller chose: both above, both below, or one on each side of the true value
+    side_ok = {'above': lambda v: v > tv, 'below': lambda v: v < tv, 'straddle': lambda v: True}[a.placement]
+    uniq = [(v, d) for v, d in uniq if side_ok(v)]
     best, best_s = None, None
     for i in range(len(uniq)):
         for j in range(i + 1, len(uniq)):
             (v1, d1), (v2, d2) = uniq[i], uniq[j]
             if abs(float(fmt(v1)) - float(fmt(v2))) <= tol:
                 continue
-            s = (0 if (v1 - tv) * (v2 - tv) < 0 else 1,
-                 len(d1['changed_axes']) + len(d2['changed_axes']),
+            if a.placement == 'straddle' and (v1 - tv) * (v2 - tv) >= 0:
+                continue
+            s = (len(d1['changed_axes']) + len(d2['changed_axes']),
                  0 if d1.get('case') != d2.get('case') else 1)
             if best_s is None or s < best_s:
                 best, best_s = (uniq[i], uniq[j]), s
     picked = list(best) if best else (uniq[:1] if uniq else [])
     n_sim = len(picked)
     if n_sim < 2 and not a.allow_random:
-        print('only %d valid simulated candidate(s) in the band (of %d simulated points); add extra runs of '
-              'neighbouring cases under sweep/extra/ and rerun, or rerun with --allow-random'
-              % (n_sim, len(rows)))
+        print('only %d valid simulated candidate(s) in the band with placement %s (of %d simulated points); '
+              'add extra runs of neighbouring cases under sweep/extra/ and rerun, choose another placement, '
+              'or rerun with --allow-random' % (n_sim, a.placement, len(rows)))
         sys.exit(2)
     seed_base = int(sha[:8], 16)
     prov = [dict(d, source='sweep', value=v, percent_from_true=round(abs(v - tv) / abs(tv) * 100, 3) if tv else None)
@@ -180,7 +188,12 @@ def main():
             print('NO_VALID_OPTIONS: no valid random value in the band after 100 tries')
             sys.exit(3)
         rng = random.Random(seed_base + 1000 + tries)
-        side = rng.choice((-1, 1)) if not vals else (-1 if vals[0] > tv else 1)
+        if a.placement == 'above':
+            side = 1
+        elif a.placement == 'below':
+            side = -1
+        else:
+            side = rng.choice((-1, 1)) if not vals else (-1 if vals[0] > tv else 1)
         pct = rng.uniform(a.d_min_pct, a.d_max_pct)
         v = tv + side * pct / 100 * scale
         if key['question_type'] == 'timing' and tf.get('time_step'):
@@ -192,19 +205,25 @@ def main():
             prov.append({'source': 'random', 'value': v, 'side': 'above' if side > 0 else 'below',
                          'percent': round(pct, 4), 'seed': seed_base + 1000 + tries})
     options = {'true': ftrue, 'd1': fmt(vals[0]), 'd2': fmt(vals[1])}
-    shuffles = []
+    shuffles, used = [], set()
     for k in range(1, a.n_shuffles + 1):
         rng = random.Random(seed_base + k)
-        tl = 'ABC'[k - 1] if k <= 3 else rng.choice('ABC')
+        # every letter order of A-C (true letter, then the distractors' order); from shuffle 4 on only orders
+        # not used yet, so no two shuffles are the same (repeats only after all 6 orders were used)
+        orders = [(tl, ds) for tl in 'ABC' for ds in (('d1', 'd2'), ('d2', 'd1'))]
+        if k <= 3:
+            cand = [o for o in orders if o[0] == 'ABC'[k - 1]]
+        else:
+            cand = [o for o in orders if o not in used] or orders
+        tl, ds = cand[rng.randrange(len(cand))]
+        used.add((tl, ds))
         rest = [x for x in 'ABC' if x != tl]
-        ds = ['d1', 'd2']
-        rng.shuffle(ds)
         letters = {tl: 'true', rest[0]: ds[0], rest[1]: ds[1], 'D': 'none'}
         shuffles.append({'k': k, 'seed': seed_base + k, 'letters': {x: letters[x] for x in 'ABCD'}})
     mcq = {'question_sha256': sha, 'true_value': tv, 'units': key.get('units', ''),
            'options_values': {'true': tv, 'd1': vals[0], 'd2': vals[1]}, 'formatted': options,
            'band': {'d_min_pct': a.d_min_pct, 'd_max_pct': a.d_max_pct, 'basis': band_basis,
-                    'reason': a.reason},
+                    'reason': a.reason, 'placement': a.placement},
            'tolerance_abs': tol, 'tolerance_type': ttype,
            'distractor_provenance': {'d1': prov[0], 'd2': prov[1]},
            'n_simulated_candidates': len(uniq), 'sweep_sources': sources,

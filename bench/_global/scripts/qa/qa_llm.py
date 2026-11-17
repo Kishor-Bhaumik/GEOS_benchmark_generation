@@ -8,12 +8,15 @@ Section 3.1 of GEOS_SWEEP_BENCH_AGENT_v1.md.
 - actual cost: usage.cost_details.upstream_inference_cost when usage.is_byok (+ gateway_fee = usage.cost),
   else usage.cost; missing -> None (then the rate cost is used and the call is flagged cost_estimated).
 - the record is appended to usage_path the moment the response arrives.
+- calls stream by default (QA_STREAM=1): STREAM_IDLE_S (120) seconds without data = dead connection;
 - technical failures (network, HTTP 5xx, timeout, malformed body) are retried once with backoff;
   HTTP 401/402/429 persisting after the retry raises UsageLimit (callers exit 75).
 - thinking is requested as reasoning={"max_tokens": REASONING_MAX_TOKENS} (0 = off; then REASONING_EFFORT, if set,
   is sent as reasoning_effort), with max_tokens = REASONING_MAX_TOKENS + MAX_ANSWER_TOKENS.
 - for anthropic/* models, cache_control marks the system prompt and the newest message (prefix caching);
-  if the gateway rejects that (HTTP 400), the call is repeated once without it and caching is switched off.
+  if the gateway rejects that (HTTP 400), the call is repeated once without it; caching is switched off for the
+  process only after CACHE_FAILS_TO_DISABLE calls in a row were rejected that way. Repair error texts are kept
+  in the record (repair_errors).
 
 Offline testing: QA_LLM_MOCK=/path/mock.py whose respond(model, messages, tools, **kw) returns a
 chat-completions response dict; no network call is made then.
@@ -22,6 +25,7 @@ import copy
 import importlib.util
 import json
 import os
+import re
 import socket
 import time
 import urllib.error
@@ -54,6 +58,8 @@ class ModelMismatch(Exception):
 
 
 _CACHE_OK = {}
+_CACHE_FAILS = {}                    # consecutive calls whose cache_control request got HTTP 400
+CACHE_FAILS_TO_DISABLE = 3
 _MOCK = None
 
 
@@ -87,15 +93,78 @@ def _with_cache_control(messages):
     return msgs
 
 
+def _redact(s):
+    """Hide Nemonist memory keys / folders in error texts that go into the usage record."""
+    return re.sub(r'\b(nmk|fld)_[A-Za-z0-9]+', r'\1_***', s)
+
+
 def _post(body, timeout):
+    """One HTTP call. Streams by default (QA_STREAM=1): a dead connection shows as STREAM_IDLE_S seconds without
+    any data (socket.timeout -> retried by chat()), instead of waiting the whole call timeout for a reply
+    that may never arrive. The streamed chunks are put back together into a normal chat-completions body."""
     base = os.environ.get('NEMONIST_BASE_URL') or C.DEFAULTS['NEMONIST_BASE_URL']
     key = os.environ.get('NEMONIST_API_KEY', '')
+    stream = os.environ.get('QA_STREAM', '1') != '0'
+    if stream:
+        body = dict(body, stream=True, stream_options={'include_usage': True})
     req = urllib.request.Request(base.rstrip('/') + '/chat/completions', method='POST',
                                  data=json.dumps(body).encode(),
                                  headers={'Authorization': 'Bearer ' + key,
                                           'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode())
+    if not stream:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode())
+    idle = float(os.environ.get('STREAM_IDLE_S') or 120)
+    t0 = time.time()
+    with urllib.request.urlopen(req, timeout=min(idle, timeout)) as r:
+        return _read_stream(r, t0, timeout)
+
+
+def _read_stream(lines, t0, timeout):
+    """Assemble an SSE stream (lines b'data: {...}') into one chat-completions response dict."""
+    resp = {'choices': [{'message': {'role': 'assistant', 'content': None}}]}
+    content, calls = [], {}
+    for raw in lines:
+        if time.time() - t0 > timeout:
+            raise socket.timeout('stream exceeded the call timeout of %d s' % timeout)
+        line = raw.decode('utf-8', 'replace').strip()
+        if not line.startswith('data:'):
+            continue                          # blank lines and ': keep-alive' comments
+        data = line[5:].strip()
+        if data == '[DONE]':
+            break
+        chunk = json.loads(data)
+        if chunk.get('error'):
+            raise CallFailed('error inside the stream: %s' % json.dumps(chunk['error'])[:300])
+        for k in ('id', 'model', 'provider'):
+            if chunk.get(k):
+                resp[k] = chunk[k]
+        if chunk.get('usage'):
+            resp['usage'] = chunk['usage']
+        for ch in chunk.get('choices') or []:
+            if ch.get('finish_reason'):
+                resp['choices'][0]['finish_reason'] = ch['finish_reason']
+            d = ch.get('delta') or {}
+            if d.get('content'):
+                content.append(d['content'])
+            for tc in d.get('tool_calls') or []:
+                c = calls.setdefault(tc.get('index', 0), {'id': None, 'type': 'function',
+                                                          'function': {'name': '', 'arguments': ''}})
+                if tc.get('id'):
+                    c['id'] = tc['id']
+                f = tc.get('function') or {}
+                if f.get('name'):
+                    c['function']['name'] += f['name']
+                if f.get('arguments'):
+                    c['function']['arguments'] += f['arguments']
+    msg = resp['choices'][0]['message']
+    if content:
+        msg['content'] = ''.join(content)
+    if calls:
+        msg['tool_calls'] = [calls[i] for i in sorted(calls)]
+    if not resp.get('usage'):
+        raise CallFailed('stream ended without a usage block (connection cut?)')
+    return resp
 
 
 def _model_ok(requested, reported):
@@ -164,6 +233,7 @@ def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path
 
     last_err, resp, t0 = None, None, time.time()
     fixes = []                       # 400 repairs: each may be applied once and does not use up a retry
+    fix_errors = []                  # the gateway's error text behind each repair (kept in the usage record)
     attempt = 0
     while attempt < 2:
         attempt += 1
@@ -188,19 +258,26 @@ def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path
                 fixes.append('strip')
                 _strip_thinking(messages)
                 last_err = 'HTTP 400 thinking signature: %s' % detail[:200]
+                fix_errors.append(last_err)
                 attempt -= 1
                 continue
             if e.code in (400, 404) and 'provider' in body and 'provider' in low and 'unpin' not in fixes:
                 fixes.append('unpin')
                 body.pop('provider', None)
                 last_err = 'HTTP %d with provider pin: %s' % (e.code, detail[:200])
+                fix_errors.append(last_err)
                 attempt -= 1
                 continue
             if e.code == 400 and use_cache and 'cache' in low and 'nocache' not in fixes:
+                # repeat THIS call without cache_control; switch caching off for the rest of the process only
+                # after CACHE_FAILS_TO_DISABLE calls in a row failed this way (one stray 400 must not end caching)
                 fixes.append('nocache')
-                _CACHE_OK[model] = False
+                _CACHE_FAILS[model] = _CACHE_FAILS.get(model, 0) + 1
+                if _CACHE_FAILS[model] >= CACHE_FAILS_TO_DISABLE:
+                    _CACHE_OK[model] = False
                 use_cache = False
                 last_err = 'HTTP 400 with cache_control: %s' % detail[:200]
+                fix_errors.append(last_err)
                 attempt -= 1
                 continue
             if e.code in (401, 402, 429):
@@ -219,6 +296,8 @@ def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path
             time.sleep(10)
     if resp is None or not resp.get('choices'):
         raise CallFailed(last_err or 'unknown failure')
+    if use_cache:
+        _CACHE_FAILS[model] = 0
 
     wall = time.time() - t0
     usage = resp.get('usage') or {}
@@ -254,6 +333,7 @@ def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path
         'cost_mismatch': bool(compare and rate and abs(compare - rate) > 0.02 * max(compare, rate)),
         'wall_s': round(wall, 2), 'retried': attempt == 2, 'cache_control': use_cache,
         'provider_pinned': body.get('provider', {}).get('order', [None])[0], 'repairs': fixes,
+        'repair_errors': [_redact(x) for x in fix_errors],
     }
     if tag:
         rec.update(tag)

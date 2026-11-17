@@ -1,0 +1,55 @@
+EVIDENCE: Nemonist adds its own cache_control blocks (HTTP 400 'Found 5')
+Date 2026-11-15 (UTC). Model anthropic/claude-sonnet-5.5 via Nemonist, provider Google.
+
+=== 1. Real run: usage records of the calls that needed repairs (turn 7 of an earlier restart; turn 5 of both sessions) ===
+{"ts": "2026-11-15T23:24:26Z", "turn": 7, "session": 1, "prompt": 20966, "provider": "Google", "repairs": ["unpin", "nocache"], "repair_errors": null}
+{"ts": "2026-11-15T23:32:11Z", "turn": 5, "session": 1, "prompt": 18871, "provider": "Google", "repairs": ["unpin", "nocache"], "repair_errors": ["HTTP 400 with provider pin: {\"error\":{\"code\":400,\"message\":\"Provider returned error: A maximum of 4 blocks with cache_control may be provided. Found 5.\"}}", "HTTP 400 with cache_control: {\"error\":{\"code\":400,\"message\":\"Provider returned error: A maximum of 4 blocks with cache_control may be provided. Found 5.\"}}"]}
+{"ts": "2026-11-15T23:32:43Z", "turn": 5, "session": 2, "prompt": 18911, "provider": "Google", "repairs": ["unpin", "nocache"], "repair_errors": ["HTTP 400 with provider pin: {\"error\":{\"code\":400,\"message\":\"Provider returned error: A maximum of 4 blocks with cache_control may be provided. Found 5.\"}}", "HTTP 400 with cache_control: {\"error\":{\"code\":400,\"message\":\"Provider returned error: A maximum of 4 blocks with cache_control may be provided. Found 5.\"}}"]}
+
+=== 2. Real run: launcher log (the call failed for good after the repairs) ===
+6:  session 1 ended: technical_failure: HTTP 400: {"error":{"code":400,"message":"Provider returned error: A maximum of 4 blocks with cache_control may be provided. Found 5."}} (None turns); status A? IN_PROGRESS
+8:  session 2 ended: technical_failure: HTTP 400: {"error":{"code":400,"message":"Provider returned error: A maximum of 4 blocks with cache_control may be provided. Found 5."}} (None turns); status A? IN_PROGRESS
+9:attempt 1: GENERATION_FAILED (controller session cap (2 sessions))
+11:DECK NOT_KEPT — attempts 1, kept None; cost generator $3.9229, no-tool $0.0000, agent $0.0000, total $3.9229
+
+=== 3. What the records show (checked against usage.jsonl and the transcripts) ===
+Turn 5 (records at 23:32:11 and 23:32:43): our request carried 2 cache_control blocks (system + newest message)
+and was rejected with "Found 5" (with and without the provider pin; see repair_errors). The retry WITHOUT our
+cache_control was ACCEPTED (record: cache_control false). -> 3 blocks were added on the way.
+Turn 6 (no usage record, because the call failed): our request was rejected, then retried WITHOUT our
+cache_control (harness code: after the 'nocache' repair the request is dict(body), plain messages), and was
+rejected again with "Found 5"; that is the 'technical_failure' in section 2. Time windows: session 1
+23:32:11-23:32:16 (session 2 started 23:32:16), session 2 23:32:43-23:32:48 (attempt_status.json written 23:32:48).
+=== 4. Standalone test with NO markers from us (caching_multiturn_test.py --tools --markers none) ===
+Request body sent by the script (dry run, same options): number of 'cache_control' occurrences =
+0
+Real run of that test, 2026-11-15 23:36:57 UTC, through Nemonist:
+  call 1: prompt   3215 | read from cache      0 | written to cache   3211 | provider Google | cost $0.0102
+  call 2: prompt  10411 | read from cache      0 | written to cache  10407 | provider Google | cost $0.0284
+  call 3: prompt  17206 | read from cache      0 | written to cache  17202 | provider Google | cost $0.0489
+  call 4: prompt  24352 | read from cache      0 | written to cache  24348 | provider Google | cost $0.0656
+  call 5: prompt  31510 | read from cache      0 | written to cache  31506 | provider Google | cost $0.0837
+  call 6: prompt  38626 | read from cache      0 | written to cache  38622 | provider Google | cost $0.1010
+-> We sent 0 cache_control blocks, yet every call WROTE its whole prompt to cache: cache_control was added
+   between our request and Google. And no call READ from cache (0%).
+
+=== 5. markers_check.py, same script, same provider (Google), only the gateway differs ===
+Test 2 = we send NO cache_control (6-call growing conversation, tools on).
+
+Nemonist -> Google (2026-11-15 23:53:36 UTC):
+  call 1: prompt  3212 | read 0 | written  3208
+  call 2: prompt 10357 | read 0 | written 10353
+  call 3: prompt 17120 | read 0 | written 17116
+  call 4: prompt 24224 | read 0 | written 24220
+  call 5: prompt 30993 | read 0 | written 30989
+  call 6: prompt 38116 | read 0 | written 38112
+OpenRouter -> Google, pinned google-vertex (2026-11-15 23:54:58 UTC):
+  call 1: prompt  2004 | read 0 | written 0
+  call 2: prompt  8756 | read 0 | written 0
+  call 3: prompt 15529 | read 0 | written 0
+  call 4: prompt 22314 | read 0 | written 0
+  call 5: prompt 29079 | read 0 | written 0
+  call 6: prompt 35811 | read 0 | written 0
+-> With no cache_control from us, only the Nemonist route writes to cache: Nemonist adds cache_control.
+   Those writes are never read back (0% on all calls).
+Test 1 (we send exactly 4 blocks) was accepted on both routes, so Nemonist does not add blocks to every request.

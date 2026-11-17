@@ -284,6 +284,7 @@ qa_build_mcq.py          distractor selection + options + shuffles (A9)
 qa_eval.py               no-tool shuffles, agent shuffles, scoring, costs, memory entry (Part B, C)
 qa_verify.py             script checks of A8 (generic; read-only for the controller)
 qa_sweep.py              reads an attempt's simulated points (data conventions of A6)
+qa_screen_infer.py       screens the sweep table for infer_then_predict (A, B) pairs (8.1), one command
 qa_common.py             shared helpers: configuration, prompt blocks, pricing, option format
 ```
 
@@ -294,6 +295,86 @@ only for `DECK_UNSUITABLE` / `DECK_BASELINE_FAILED`. `qa_eval.py` writes `eval/`
 or `SANDBOX_FAILED` attempt, `results.md`, and `deck_result.json` in every other case;
 when the controller already wrote `deck_result.json`, the launcher only adds the costs
 and keeps the status.
+
+### 3.5 Helper scripts: commands to use (do not read their code)
+
+These are the commands that work. Use them as given; read a script's code only when its
+command fails, and then only the part named in the error. Shorthands: `S=$BENCH_DIR/_global/scripts`,
+`DK=` the deck folder, `A=$DK/attempt_<n>`, `GEOS=$GEOS_BIN`. Always `export PYTHONDONTWRITEBYTECODE=1`.
+
+```text
+A0 copy the deck (setup_deck.py builds its own tree under --D, so use a temp folder):
+  T=$BENCH_DIR/_tmp_setup_$RUN_TAG; mkdir -p $T
+  python $S/setup_deck.py --D $T --geos-root $GEOS_ROOT --xml $INPUT_XML --run-tag $RUN_TAG --geos-bin $GEOS | head -20
+  cp -r $T/decks/<deck_slug>/$RUN_TAG/source $DK/source && rm -rf $T
+  -> source/ (deck + included files), source_manifest.json, deck_keywords.json
+
+A2 baseline (one GEOS run; input.xml must be in the run folder, output/ must not exist):
+  mkdir -p $DK/exploration/baseline; cp $DK/source/*.xml $DK/exploration/baseline/
+  cd $DK/exploration/baseline; cp <deck>.xml input.xml
+  python $S/run_geos.py --geos $GEOS --run-dir $PWD --run-id baseline --write-command-txt | tail -5
+  -> run.json (status, first_error), output/, stdout.log, stderr.log
+
+A3 output inventory and mesh check:
+  python $S/inventory_outputs.py $DK/exploration/baseline/output $DK/exploration/output_manifest.json | head -20
+  python $S/check_mesh_description.py --baseline-output $DK/exploration/baseline/output --description mesh_desc.json | tail -8
+  mesh_desc.json = {"bodies": [{"name": "<mesh body>", ...}]}; body kinds: box (x, nx, y, ny, z, nz),
+  explicit_nodes, box_plus_polylines, piecewise_box, split_notch_plate, gll_box, inclined_cartesian_wellbore
+  (radius_nodes, theta_deg, z, map_from_radius, outer_half_width, inner_radius, trajectory: two xyz points),
+  radial_cartesian_blend. The fields of each kind are in the script's top docstring: `sed -n 1,60p $S/check_mesh_description.py`.
+
+A5 sweep (one command; resumable; every launch counted in launch_ledger.json):
+  $A/sweep/template.xml   the deck with {{NAME}} placeholders (every occurrence replaced)
+  $A/sweep/sweep_config.json:
+    {"geos": "<GEOS_BIN>", "template": "template.xml", "parallel_jobs": <PARALLEL_JOBS>,
+     "budget": {"max_launches": <cap>, "ledger": "launch_ledger.json"},
+     "derived": {"NAME": "<python expression of params, math available>"},
+     "axes": {"<axis>": [grid values], ...},
+     "sets": {"pilot": {"dir": "pilot", "prefix": "pil_", "points": [{"run_id": "pil_01", "params": {...}}]},
+              "sweep": {"dir": "runs", "prefix": "run_", "start": 1, "grid": {"<axis>": [...], ...}}},
+     "failed_runs_csv": "failed_runs.csv"}
+  cd $A/sweep; python $S/sweep_runner.py --config sweep_config.json --set pilot --jobs $PARALLEL_JOBS | tail -5
+  cd $A/sweep; python $S/sweep_runner.py --config sweep_config.json --set sweep --jobs $PARALLEL_JOBS | tail -5
+  -> <set dir>/<run_id>/{input.xml, run.json (params, status), output/}
+
+A5 table: write a deck-specific $A/sweep/extract_table.py with two modes:
+  --table <sweep dir> --csv sweep_table.csv   one row per successful run: run_id, the axes, the observables
+  --observables <run dir> [--delete-fields]   writes <run dir>/observables.json =
+      {"run_id": "refine/ref_NN", "params": {...}, "observables": {<column>: value}} (used by refinement)
+  (the generic $S/extract_table.py --spec ... reads TimeHistory files; use it when the deck writes them)
+
+A6 choose the question (infer_then_predict): screen every hidden axis / case / (A, B) pair in one command
+  instead of trying pairs one by one:
+  cd $S/qa; python qa_screen_infer.py --attempt-dir $A [--hidden <axis>] [--columns a,b,..] | head -25
+  -> passing pairs, best first: lin× (straight-line miss in B tolerances, needs > 3), round (needs < 1/3),
+     bspan% (how much B moves), h* (a good hidden value). Pick one, then record the real 8.1 checks.
+
+A7 refinement (bisection on one axis; output types and infer_then_predict):
+  write $A/sweep/refine_question.json = [{"qid": "", "needs_refinement": true,
+     "tolerance_type": "relative", "tolerance_value": <TOLERANCE_PERCENT>,
+     "search": {"kind": "infer_predict", "axis": "<hidden axis>", "target_expr": "O['<A column>']",
+                "b_expr": "O['<B column>']", "target_value": <observed A>, "fixed_params": {<other axes>}},
+     "bracket": {"lo": .., "hi": .., "f_lo": <A at lo>, "f_hi": <A at hi>, "b_lo": .., "b_hi": ..,
+                 "run_lo": "<run_id>", "run_hi": "<run_id>"}}]
+  (for inverse / threshold: drop "kind"/"b_expr"; target_expr is the searched output)
+  cd $A/sweep; python $S/refine_bisect.py --config sweep_config.json --questions refine_question.json \
+      --extract-script $PWD/extract_table.py --tol-percent <TOLERANCE_PERCENT> --jobs 1 --out refine_results.json | tail -5
+  -> refine/ref_NN/observables.json; refine_results.json[""] = final bracket, true value, history
+
+A4 (attempt n > 1 after TOO_EASY) read how the no-tool model answered attempt m = n - 1
+  (unquoted E, so that $DK is expanded; write m as a number):
+  python - <<E
+  import json, glob
+  for f in sorted(glob.glob('$DK/attempt_<m>/eval/no_tool_s*.json')):
+      d = json.load(open(f)); t = d['answer_text']
+      print('=== %s letter %s computed %s\n%s\n...\n%s' % (f[-16:], d.get('letter'), d.get('computed_value'), t[:1200], t[-600:]))
+  E
+
+A8 verify and freeze, A9 MCQ (harness scripts, Sections 6 and 9):
+  cd $S/qa; QUESTION_TYPE=$QUESTION_TYPE TOLERANCE_PERCENT=$TOLERANCE_PERCENT python qa_verify.py --attempt-dir $A | cut -c1-200
+  ... fix what failed, then the same command with --freeze
+  cd $S/qa; python qa_build_mcq.py --attempt-dir $A --d-min-pct <..> --d-max-pct <..> --placement above|below|straddle --reason "<one sentence>"
+```
 
 ---
 
@@ -450,7 +531,11 @@ Using `deck_summary.md` and `deck_memory.md`, write `attempt_<n>/design.md`:
   time, which list (a) shortcut it targets and why a no-tool model should miss it;
 - for attempts n > 1: what the memory shows went wrong (too easy: which option the
   no-tool model picked and why the shortcut worked; agent failed: what the agent
-  computed and why it missed) and what is changed. A new attempt must change the
+  computed and why it missed) and what is changed. When the previous attempt was
+  `TOO_EASY`, read the no-tool answers themselves (command in Section 3.5): note the
+  method each one used (formula, estimate, guess among the options, picking the middle
+  value) and design the new question so that this method fails. The `COMPUTED_VALUE` in
+  the memory is often just the chosen option's value, not the model's own result. A new attempt must change the
   question substantially (different observable, case, hidden input or structural
   option), not only reword it;
 - **sweep reuse decision.** The controller decides whether an earlier attempt's sweep
@@ -602,10 +687,11 @@ the attempt `FROZEN` in `attempt_status.json`; afterwards it refuses any change 
 the attempt budget, mark the attempt `GENERATION_FAILED` with the reason and stop.
 
 ### A9 — Build the MCQ
-1. Choose the distractor band `[D_MIN_PCT, D_MAX_PCT]` (Section 9.3) and write it, with a
-   one-sentence reason, into `design.md`.
+1. Choose the distractor band `[D_MIN_PCT, D_MAX_PCT]` and the placement (`above`,
+   `below` or `straddle`, Section 9.3) and write them, with a one-sentence reason, into
+   `design.md`.
 2. Run `qa_build_mcq.py --attempt-dir <attempt> --d-min-pct <..> --d-max-pct <..>
-   --reason "<..>"` (ONE command). It selects the two distractors, formats the options, builds the
+   --placement <..> --reason "<..>"` (ONE command). It selects the two distractors, formats the options, builds the
    `N_SHUFFLES` letter keys, writes `mcq.json` (band included) and prints the options
    and the distractors' provenance, never the letter keys. If it reports that fewer than
    two simulated candidates fit (exit code 2), the controller may first launch a few
@@ -702,7 +788,9 @@ clearly different place or time (not B = A at a neighbouring cell).
 "infer_predict_checks": {...}}`.
 
 Checks on the sweep table (all other inputs at the question's case), each recorded with
-its numbers; if one fails, choose another case or another A/B pair:
+its numbers; if one fails, choose another case or another A/B pair. Screen the candidates
+first with `qa_screen_infer.py` (Section 3.5), which estimates uniqueness, nonlinearity and
+rounding for every pair from the grid in one command:
 - **Uniqueness:** A is monotonic in the hidden input across the stated interval, so one
   input value reproduces the observed A;
 - **Nonlinearity:** fit B against A by a straight line across the sweep points of the
@@ -767,8 +855,10 @@ value, that candidate is rejected. Option D is always `None of them`.
 
 ### 9.2 Shuffles
 Shuffle k = 1 … `N_SHUFFLES`: the true answer takes letter A, B, C in shuffles 1, 2, 3
-and a seeded random letter of A–C from shuffle 4 on; the two distractors fill the other
-two of A–C in seeded random order. Seed = `int(<first 8 hex digits of the question
+and the two distractors fill the other two of A–C in seeded random order. From shuffle 4
+on, the letter order (true letter + distractor order, 6 possible) is a seeded random choice
+among the orders not used by an earlier shuffle, so no two shuffles are identical (repeats
+only after all 6 orders are used). Seed = `int(<first 8 hex digits of the question
 SHA256>, 16) + k` (integer addition). The letter key per shuffle is stored in `mcq.json` and never shown to any model or
 printed by the controller.
 
@@ -791,9 +881,13 @@ Candidates (all real simulation outputs or values interpolated from them):
 
 A candidate is valid if it lies inside the band, has the true answer's sign and units,
 is more than `tolerance_abs` from the true value and, once formatted, differs from the
-other distractor by more than `tolerance_abs`. The script picks two valid candidates,
-preferring different sides of the true value, then fewest changed axes, then distinct
-source cases. Each distractor's source runs, column and changed axis are stored in
+other distractor by more than `tolerance_abs`. **Placement** (the controller's choice,
+`--placement`): `above` (both distractors above the true value), `below` (both below) or
+`straddle` (one on each side). Choose it per question so that the true value is not
+simply the middle option, which a guessing model would pick; write the choice and its
+reason in `design.md`. The script then picks two valid candidates with that placement,
+preferring fewest changed axes, then distinct source cases; a random fallback keeps the
+placement. Each distractor's source runs, column and changed axis are stored in
 `mcq.json`.
 
 **Fallback (seeded random).** For each missing distractor, draw a seeded value inside
@@ -1032,7 +1126,7 @@ shuffle k's order. `{UNITS}` comes from `answer_key.json`.
 ### Prompt: CONTROLLER_SYSTEM
 
 ```text
-You are the controller of a GEOS benchmark experiment. You have tools: bash, read_file and write_file. Commands run in the geos conda environment; you can write only under {BENCH_DIR}. Your working directory {GEN_MEMORY_DIR} is your persistent memory folder across all questions: keep any memory files (such as .nemonist/) there and nowhere else. Write all experiment files under the deck folder you are given, using absolute paths. Follow the protocol file you are given exactly. Keep every command's printed output to about 50 lines. Never print a whole file, log, CSV or HDF5 dump. Wait for long jobs inside one command instead of polling with many tool calls. When your part is done, reply without a tool call with a one-paragraph status.
+You are the controller of a GEOS benchmark experiment. You have tools: bash, read_file and write_file. Commands run in the geos conda environment; you can write only under {BENCH_DIR}. Your working directory {GEN_MEMORY_DIR} is your persistent memory folder across all questions: keep any memory files (such as .nemonist/) there and nowhere else. Write all experiment files under the deck folder you are given, using absolute paths. Follow the protocol file you are given exactly. For the helper scripts use the commands of its Section 3.5 as given; do not read their code unless a command fails. Keep every command's printed output to about 50 lines. Never print a whole file, log, CSV or HDF5 dump. Wait for long jobs inside one command instead of polling with many tool calls. When your part is done, reply without a tool call with a one-paragraph status.
 ```
 
 ---
