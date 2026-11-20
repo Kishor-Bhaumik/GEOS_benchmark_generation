@@ -1,0 +1,130 @@
+# Coupled-multiphysics GEOS decks for the AGENT v1 benchmark (questions where GEOS is the practical route).
+# Selected 2026-11-18 from inputFiles/*/*_runtime.txt: status OK and runtime <= 30 s (a sweep needs many runs).
+# Categories: poromechanics, poromechanics with fractures, thermo-poromechanics, hydraulic fracturing,
+# flow in fractures (single/multiphase, thermal), thermal multiphase flow, induced seismicity.
+# Columns: path relative to GEOS_ROOT (use as INPUT_XML) | category | baseline runtime
+
+# --- poromechanics
+inputFiles/poromechanics/PoroElastic_gravity.xml                                                poromechanics                      2.6 s
+inputFiles/poromechanics/PoroViscoExtendedDruckerPrager_smoke.xml                               poromechanics                      2.8 s
+inputFiles/poromechanics/PoroViscoDruckerPrager_smoke.xml                                       poromechanics                      2.9 s
+inputFiles/poromechanics/impermeableFault_smoke.xml                                             poromechanics                      2.9 s
+inputFiles/poromechanics/permeableFault_smoke.xml                                               poromechanics                      2.9 s
+inputFiles/poromechanics/PoroElasticWellbore_smoke.xml                                          poromechanics                      3.0 s
+inputFiles/poromechanics/PoroElastic_Mandel_smoke_sequential.xml                                poromechanics                      3.1 s
+inputFiles/poromechanics/PoroViscoModifiedCamClay_smoke.xml                                     poromechanics                      3.1 s
+inputFiles/poromechanics/PoroModifiedCamClayWellbore_smoke.xml                                  poromechanics                      3.2 s
+inputFiles/poromechanics/PoroDelftEggWellbore_smoke.xml                                         poromechanics                      3.3 s
+inputFiles/poromechanics/PoroElastic_Mandel_prism6_smoke.xml                                    poromechanics                      3.3 s
+inputFiles/poromechanics/PoroDruckerPragerWellbore_smoke.xml                                    poromechanics                      3.4 s
+inputFiles/poromechanics/PoroElastic_Mandel_smoke_fim.xml                                       poromechanics                      3.4 s
+inputFiles/poromechanics/PoroElastic_CarmanKozenyPermeability_fim_smoke.xml                     poromechanics                      3.7 s
+inputFiles/poromechanics/PoroElastic_CarmanKozenyPermeability_sequential_smoke.xml              poromechanics                      3.9 s
+inputFiles/poromechanics/PoroElastic_Terzaghi_smoke.xml                                         poromechanics                      4.4 s
+inputFiles/poromechanics/PoroElastic_staircase_singlephase_3d_fim_stab.xml                      poromechanics                      5.8 s
+inputFiles/poromechanics/PoroElastic_deadoil_3ph_baker_2d_fim.xml                               poromechanics                      7.3 s
+inputFiles/poromechanics/PoroElastic_staircase_singlephase_3d_fim.xml                           poromechanics                      7.4 s
+inputFiles/poromechanics/PoroElastic_staircase_co2_3d_fim_stab.xml                              poromechanics                      9.5 s
+inputFiles/poromechanics/PoroElastic_deadoil_3ph_baker_2d_sequential.xml                        poromechanics                      9.8 s
+inputFiles/poromechanics/PoroElastic_staircase_singlephase_3d_sequential_stab.xml               poromechanics                     13.2 s
+inputFiles/poromechanics/PoroElastic_staircase_singlephase_3d_sequential.xml                    poromechanics                     14.5 s
+inputFiles/poromechanics/PoroElastic_staircase_co2_3d_sequential_stab.xml                       poromechanics                     16.1 s
+inputFiles/poromechanics/PoroElastic_staircase_co2_3d_fim.xml                                   poromechanics                     21.7 s
+inputFiles/poromechanics/PoroElastic_staircase_co2_3d_sequential.xml                            poromechanics                     25.7 s
+
+# --- poromechanicsFractures
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_faultSlip_BartonBandis_smoke.xml poromechanicsFractures             2.3 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_faultSlip_smoke.xml poromechanicsFractures             2.4 s
+inputFiles/poromechanicsFractures/EDFM/PoroElastic_efem-edfm_pressurizedFrac_smoke.xml          poromechanicsFractures             2.4 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_faultSlip_sequential_smoke.xml poromechanicsFractures             2.5 s
+inputFiles/poromechanicsFractures/EDFM/PoroElastic_efem-edfm_inclinedFrac_smoke.xml             poromechanicsFractures             2.5 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_openingFrac_horizontal_smoke.xml poromechanicsFractures             2.6 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_openingFrac_horizontal_sequential_smoke.xml poromechanicsFractures             2.7 s
+inputFiles/poromechanicsFractures/EDFM/PoroElastic_efem-edfm_verticalFrac_smoke.xml             poromechanicsFractures             2.8 s
+inputFiles/poromechanicsFractures/Contact/AugmentedLagrangianMultipliers/PoroElastic_ALM_conformingFracture_2d_openingFrac_vertical_sequential_smoke.xml poromechanicsFractures             3.1 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_openingFrac_vertical_smoke.xml poromechanicsFractures             3.3 s
+inputFiles/poromechanicsFractures/Contact/AugmentedLagrangianMultipliers/PoroElastic_ALM_conformingFracture_2d_openingFrac_horizontal_sequential_smoke.xml poromechanicsFractures             3.4 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_openingFrac_vertical_sequential_smoke.xml poromechanicsFractures             3.4 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/singlePhasePoromechanics_FaultModel_well_seq_smoke.xml poromechanicsFractures             8.3 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/ExponentialDecayPermeability_conformingFracture_smoke.xml poromechanicsFractures            11.3 s
+inputFiles/poromechanicsFractures/EDFM/SlipPermeability_embeddedFrac.xml                        poromechanicsFractures            17.3 s
+inputFiles/poromechanicsFractures/EDFM/ExponentialDecayPermeability_edfm_smoke.xml              poromechanicsFractures            17.5 s
+inputFiles/poromechanicsFractures/EDFM/SlipPermeability_pEDFM_smoke.xml                         poromechanicsFractures            17.7 s
+inputFiles/poromechanicsFractures/EDFM/WillisRichardsPermeability_efem-edfm_smoke.xml           poromechanicsFractures            18.4 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/singlePhasePoromechanics_FaultModel_smoke.xml poromechanicsFractures            19.1 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_dfm_PEBICrack_smoke.xml poromechanicsFractures            21.3 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_faultSlip_BartonBandis_benchmark.xml poromechanicsFractures            23.2 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_openingFrac_vertical_benchmark.xml poromechanicsFractures            26.0 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_faultSlip_benchmark.xml poromechanicsFractures            26.8 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/multiphasePoromechanics_FaultModel_well_seq_smoke.xml poromechanicsFractures            28.5 s
+inputFiles/poromechanicsFractures/Contact/LagrangianMultipliers/PoroElastic_conformingFracture_2d_faultSlip_sequential_benchmark.xml poromechanicsFractures            29.8 s
+
+# --- thermoPoromechanics
+inputFiles/thermoPoromechanics/ThermoPoroElastic_SinglePhase_ThermalGradient_smoke_sequential.xml thermoPoromechanics                2.7 s
+inputFiles/thermoPoromechanics/ThermoPoroElastic_SinglePhase_ThermalGradient_smoke_fim.xml      thermoPoromechanics                3.3 s
+inputFiles/thermoPoromechanics/ThermoPoroDruckerPrager_consolidation_smoke.xml                  thermoPoromechanics                7.0 s
+inputFiles/thermoPoromechanics/ThermoPoroExtendedDruckerPrager_consolidation_smoke.xml          thermoPoromechanics                8.9 s
+inputFiles/thermoPoromechanics/ThermoPoroElastic_consolidation_smoke_fim.xml                    thermoPoromechanics                9.7 s
+inputFiles/thermoPoromechanics/ThermoPoroMCC_consolidation_smoke.xml                            thermoPoromechanics               10.3 s
+inputFiles/thermoPoromechanics/ThermoPoroElastic_consolidation_smoke_sequential.xml             thermoPoromechanics               11.4 s
+inputFiles/thermoPoromechanics/ThermoPoroElastic_consolidation_benchmark_fim.xml                thermoPoromechanics               20.7 s
+
+# --- thermoPoromechanicsFractures
+inputFiles/thermoPoromechanicsFractures/ThermoPoroElastic_efem-edfm_verticalFrac_smoke.xml      thermoPoromechanicsFractures       4.7 s
+inputFiles/thermoPoromechanicsFractures/ThermoPoroElastic_conforming_smoke.xml                  thermoPoromechanicsFractures       6.2 s
+
+# --- hydraulicFracturing
+inputFiles/hydraulicFracturing/Sneddon_hydroFrac_smoke.xml                                      hydraulicFracturing                2.8 s
+inputFiles/hydraulicFracturing/kgdToughnessDominated_poroelastic_smoke.xml                      hydraulicFracturing                4.0 s
+inputFiles/hydraulicFracturing/kgdViscosityDominated_poroelastic_smoke.xml                      hydraulicFracturing                4.3 s
+inputFiles/hydraulicFracturing/heterogeneousInSitu_smoke.xml                                    hydraulicFracturing                5.7 s
+inputFiles/hydraulicFracturing/kgdValidation_smoke.xml                                          hydraulicFracturing                6.0 s
+inputFiles/hydraulicFracturing/pknViscosityDominated_poroelastic_smoke.xml                      hydraulicFracturing                8.7 s
+inputFiles/hydraulicFracturing/pennyShapedToughnessDominated_poroelastic_smoke.xml              hydraulicFracturing                9.3 s
+inputFiles/hydraulicFracturing/pennyShapedViscosityDominated_poroelastic_smoke.xml              hydraulicFracturing               10.9 s
+inputFiles/hydraulicFracturing/kgdNodeBased_C3D6_smoke.xml                                      hydraulicFracturing               12.3 s
+inputFiles/hydraulicFracturing/walshQuarterNoChombo_smoke.xml                                   hydraulicFracturing               14.3 s
+inputFiles/hydraulicFracturing/kgdEdgeBased_C3D6_smoke.xml                                      hydraulicFracturing               15.9 s
+inputFiles/hydraulicFracturing/kgdViscosityDominated_smoke.xml                                  hydraulicFracturing               18.8 s
+inputFiles/hydraulicFracturing/kgdToughnessDominated_smoke.xml                                  hydraulicFracturing               20.8 s
+inputFiles/hydraulicFracturing/pennyShapedToughnessDominated_smoke.xml                          hydraulicFracturing               23.5 s
+inputFiles/hydraulicFracturing/pennyShapedAnisotropicToughness_smoke.xml                        hydraulicFracturing               25.1 s
+inputFiles/hydraulicFracturing/pennyShapedViscosityDominated_smoke.xml                          hydraulicFracturing               28.2 s
+
+# --- singlePhaseFlowFractures
+inputFiles/singlePhaseFlowFractures/fractureMatrixFlowWithGravity_conforming_2d_smoke.xml       singlePhaseFlowFractures           2.1 s
+inputFiles/singlePhaseFlowFractures/fractureMatrixFlow_pedfm_impermeableFracture_smoke.xml      singlePhaseFlowFractures           2.1 s
+inputFiles/singlePhaseFlowFractures/fractureMatrixFlowWithGravity_edfm_verticalFrac_smoke.xml   singlePhaseFlowFractures           2.2 s
+inputFiles/singlePhaseFlowFractures/fractureMatrixFlow_edfm_inclinedFrac_benchmark.xml          singlePhaseFlowFractures           2.2 s
+inputFiles/singlePhaseFlowFractures/fractureFlowWithGravity_conforming_2d_smoke.xml             singlePhaseFlowFractures           2.4 s
+inputFiles/singlePhaseFlowFractures/fractureMatrixFlow_edfm_horizontalFrac_smoke.xml            singlePhaseFlowFractures           2.4 s
+inputFiles/singlePhaseFlowFractures/impermeableFault_conforming_smoke.xml                       singlePhaseFlowFractures           2.4 s
+inputFiles/singlePhaseFlowFractures/fractureMatrixFlow_edfm_inclinedFrac_smoke.xml              singlePhaseFlowFractures           2.6 s
+inputFiles/singlePhaseFlowFractures/fractureMatrixFlow_conforming_2d.xml                        singlePhaseFlowFractures           2.8 s
+inputFiles/singlePhaseFlowFractures/fractureFlow_conforming_2d.xml                              singlePhaseFlowFractures           3.2 s
+inputFiles/singlePhaseFlowFractures/impermeableFault_conforming_benchmark.xml                   singlePhaseFlowFractures           3.4 s
+inputFiles/singlePhaseFlowFractures/fractureJunctionFlow_conforming_2d.xml                      singlePhaseFlowFractures           4.9 s
+
+# --- multiphaseFlowFractures
+inputFiles/multiphaseFlowFractures/deadoil_3ph_corey_2d_impermeableFault.xml                    multiphaseFlowFractures            3.8 s
+inputFiles/multiphaseFlowFractures/deadoil_3ph_corey_edfm_1d.xml                                multiphaseFlowFractures            5.6 s
+inputFiles/multiphaseFlowFractures/deadoil_3ph_corey_pedfm_impermeableFault_smoke.xml           multiphaseFlowFractures            6.3 s
+inputFiles/multiphaseFlowFractures/deadoil_3ph_corey_2d_edfm.xml                                multiphaseFlowFractures           10.6 s
+inputFiles/multiphaseFlowFractures/deadOil_fractureMatrixFlow_edfm_horizontalFrac_smoke.xml     multiphaseFlowFractures           22.4 s
+
+# --- thermalSinglePhaseFlowFractures
+inputFiles/thermalSinglePhaseFlowFractures/fractureMatrixThermalFlow_edfm_benchmark.xml         thermalSinglePhaseFlowFractures    1.9 s
+inputFiles/thermalSinglePhaseFlowFractures/fractureMatrixThermalFlow_conforming_benchmark.xml   thermalSinglePhaseFlowFractures    2.1 s
+inputFiles/thermalSinglePhaseFlowFractures/fractureMatrixThermalFlow_conforming_smoke.xml       thermalSinglePhaseFlowFractures    2.3 s
+inputFiles/thermalSinglePhaseFlowFractures/fractureMatrixThermalFlow_edfm_smoke.xml             thermalSinglePhaseFlowFractures    2.3 s
+
+# --- thermalMultiphaseFlow
+inputFiles/thermalMultiphaseFlow/co2_thermal_2d.xml                                             thermalMultiphaseFlow              2.9 s
+inputFiles/thermalMultiphaseFlow/co2_thermal_obl_3d.xml                                         thermalMultiphaseFlow             26.0 s
+
+# --- inducedSeismicity
+inputFiles/inducedSeismicity/SeismicityRate_analytical_verification_smoke.xml                   inducedSeismicity                  1.9 s
+inputFiles/inducedSeismicity/SpringSliderExplicit_A_smoke.xml                                   inducedSeismicity                  6.1 s
+inputFiles/inducedSeismicity/SpringSliderExplicit_S_smoke.xml                                   inducedSeismicity                  7.1 s
+inputFiles/inducedSeismicity/SeismicityRate_poromechanics_smoke.xml                             inducedSeismicity                 27.7 s
+inputFiles/inducedSeismicity/SpringSliderImplicit_A_smoke.xml                                   inducedSeismicity                 29.3 s

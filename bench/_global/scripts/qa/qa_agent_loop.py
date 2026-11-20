@@ -82,6 +82,7 @@ class Session:
         self.hidden = S.hidden_paths(cfg) if role == 'agent' else []
         self.forbidden_attempts = 0
         self.geos_cmds = 0
+        self.geos_invocations = 0         # commands that launch GEOS on an input deck (geosx ... -i ...)
         self.nemonist_attempts = 0
 
     def argv(self, inner):
@@ -96,6 +97,8 @@ class Session:
             self.forbidden_attempts += 1
         if re.search(r'\bgeosx?\b', text):
             self.geos_cmds += 1
+        if re.search(r'\bgeosx\b[^\n;|&]*\s-i\s', text):
+            self.geos_invocations += 1
 
     def bash(self, command, timeout_s, remaining):
         self.note_command(command)
@@ -225,4 +228,4 @@ def run_session(cfg, role, model, system, user, usage_path, transcript_path=None
     log({'ts': C.now_utc(), 'event': 'end', 'ended': ended, 'turns': turns, 'wall_s': round(wall, 1)})
     return {'final_text': final_text, 'turns': turns, 'wall_s': round(wall, 1), 'ended': ended, 'nudges': nudges,
             'forbidden_path_attempts': sess.forbidden_attempts, 'nemonist_attempts': sess.nemonist_attempts,
-            'geos_runs': S.geos_runs(state_dir) if state_dir else None}
+            'geos_runs': S.geos_runs(state_dir) if state_dir else None, 'geos_invocations': sess.geos_invocations}

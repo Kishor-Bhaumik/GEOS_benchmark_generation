@@ -80,6 +80,8 @@ AGENT_MAX_TURNS             = 300               # model turns per agent session
 AGENT_MAX_GEOS_RUNS         = 60                # GEOS launches per agent session
 AGENT_CORES                 = 16                # CPU cores pinned to one agent session
 AGENT_NET                   = on                # on | off: network inside the agent sandbox
+AGENT_REQUIRE_GEOS          = on                # on: a right letter counts only with at least one GEOS run (B2)
+NO_TOOL_RETRY_MAX_TOKENS    = 40000             # max_tokens of the retry of a no-tool reply cut off by max_tokens (B1)
 AGENT_RO_BINDS              = $AGENT_RO_BINDS   # extra read-only paths GEOS needs (e.g. the thirdPartyLibs install)
 AGENT_VISIBLE_UNTRACKED     = $AGENT_VISIBLE_UNTRACKED  # untracked/ignored GEOS_ROOT paths the agent may see; default = the build root that holds bin/ and lib/ of GEOS_BIN (e.g. build-conda-geos-release/)
 TOOL_OUTPUT_MAX_CHARS       = 6000              # longer tool outputs are cut (head + tail) before the model sees them
@@ -370,6 +372,14 @@ A4 (attempt n > 1 after TOO_EASY) read how the no-tool model answered attempt m 
       print('=== %s letter %s computed %s\n%s\n...\n%s' % (f[-16:], d.get('letter'), d.get('computed_value'), t[:1200], t[-600:]))
   E
 
+A4 (attempt n > 1 after AGENT_FAILED) read the agent's final messages of attempt m = n - 1:
+  python - <<E
+  import json, glob
+  for f in sorted(glob.glob('$DK/attempt_<m>/eval/agent_s*.json')):
+      d = json.load(open(f)); t = d.get('final_message') or ''
+      print('=== %s outcome %s computed %s GEOS runs %s\n%s' % (f[-14:], d.get('outcome'), d.get('computed_value'), d.get('geos_runs'), t[:2500]))
+  E
+
 A8 verify and freeze, A9 MCQ (harness scripts, Sections 6 and 9):
   cd $S/qa; QUESTION_TYPE=$QUESTION_TYPE TOLERANCE_PERCENT=$TOLERANCE_PERCENT python qa_verify.py --attempt-dir $A | cut -c1-200
   ... fix what failed, then the same command with --freeze
@@ -534,7 +544,11 @@ Using `deck_summary.md` and `deck_memory.md`, write `attempt_<n>/design.md`:
   computed and why it missed) and what is changed. When the previous attempt was
   `TOO_EASY`, read the no-tool answers themselves (command in Section 3.5): note the
   method each one used (formula, estimate, guess among the options, picking the middle
-  value) and design the new question so that this method fails. The `COMPUTED_VALUE` in
+  value) and design the new question so that this method fails. When it was
+  `AGENT_FAILED`, read the agent's final messages (Section 3.5): what it set up, which
+  inputs it said were missing or assumed, which solver it used, what it computed. A
+  consistent wrong value usually means the question left an input out or allowed another
+  model/solver choice: state that input or choice explicitly in the new question. The `COMPUTED_VALUE` in
   the memory is often just the chosen option's value, not the model's own result. A new attempt must change the
   question substantially (different observable, case, hidden input or structural
   option), not only reword it;
@@ -549,6 +563,14 @@ Using `deck_summary.md` and `deck_memory.md`, write `attempt_<n>/design.md`:
   Section 9.3, and (iii) the type checks of Section 8 can be made on the table. Include
   a structural axis (a change of scenario type, e.g. fixed-pressure vs fixed-rate
   boundary, drained vs undrained, monotonic vs cyclic) where the deck supports one;
+- **mesh size.** If the deck's mesh is generated internally (element counts set in the XML),
+  refine it in `template.xml` so that solving the question with a hand-written solver is
+  impractical (for example a few thousand elements or more), while one GEOS run of the
+  case still finishes in at most 3 minutes (check the runtime with a pilot). The refined
+  mesh is stated in the question like any mesh (element type, counts, spacing or
+  grading); test its node-position description (A3) on a pilot run's output. A mesh read
+  from a file is kept as it is. Record the chosen counts, the pilot runtime and the reason
+  in `design.md`;
 - checks before running: no planned observable gets its effect from an ARTIFACT item;
   every input stays inside every table's and model's valid range; something happens at
   the asked place and time; for a time-type answer, the time step near the event is at
@@ -918,7 +940,10 @@ parameter, timeout `NO_TOOL_TIMEOUT_S`. The letter is read from the last
 (D), or `no_answer`. A reply without a parsable letter is retried once with a new
 identical fresh call (technical failures are retried only inside `qa_llm.py`, 3.1); if
 the retry, or a call that still fails technically, gives no letter, the outcome is
-`no_answer`. Every outcome other than `correct` is a no-tool **failure**.
+`no_answer`. A reply cut off by `max_tokens` (`finish_reason` "length", usually inside the
+thinking) is retried with the larger cap `NO_TOOL_RETRY_MAX_TOKENS`; if the retry is cut
+off too, the outcome is `cut_off`. Every outcome other than `correct` and `cut_off` is a
+no-tool **failure** (a model that never finished its answer has not failed the question).
 Written to `eval/no_tool_s<k>.json`: question SHA256, shuffle k, answer text,
 `COMPUTED_VALUE` line if present, letter, outcome, and usage, actual and rate cost and
 wall time summed over ALL calls made for the shuffle (retries included, each also listed).
@@ -934,9 +959,14 @@ prompt). The letter is read from the last `FINAL ANSWER:` line of its final mess
 Outcomes as in B1; a session that ends at a cap without a letter is `no_answer`. A
 session that fails for a technical reason before its first GEOS run is retried once in a
 new empty workspace; a technical failure after that, or of the retry, is `no_answer`.
-Every outcome other than `correct` is an agent **failure**. Written to
+**GEOS is required** (`AGENT_REQUIRE_GEOS = on`): the right letter counts only when the
+session actually ran GEOS, i.e. the counting wrapper recorded at least one GEOS launch or
+one of its commands ran `geosx ... -i <input>`. A right letter without a GEOS run is
+`correct_no_geos` (for example an answer from a hand-written solver). Every outcome other
+than `correct` is an agent **failure**. Written to
 `eval/agent_s<k>.json`: final message, `COMPUTED_VALUE` if present, letter, outcome,
-turns, GEOS runs, `forbidden_path_attempts`, wall time, and usage, actual and rate cost
+turns, GEOS runs, GEOS commands (`geos_invocations`), `used_geos`, `cut_off` (a call
+ended with `finish_reason` "length"), `forbidden_path_attempts`, wall time, and usage, actual and rate cost
 summed over ALL sessions of the shuffle (from `agent_s<k>_usage.jsonl`). Then the
 workspace and the full transcript are deleted.
 
@@ -1105,11 +1135,12 @@ Available to you, read-only:
 - the GEOS multiphysics simulator, run as `geosx -i <input.xml> -o <output_dir>` (put inputs and outputs in your working directory); MPI and Python (with numpy, h5py and the usual scientific packages) are available;
 - the GEOS source code, documentation and example input decks under {GEOS_ROOT} (for example {GEOS_ROOT}/inputFiles and {GEOS_ROOT}/src/docs).
 
-You may do anything that helps you answer: read the source and the examples, build and run simulations, write and run scripts, analyse outputs. Your limits: at most {MAX_GEOS_RUNS} GEOS runs in total, {MAX_TURNS} model turns (each tool call is one turn) and about {WALL_HOURS} hours. Commands run on {CORES} CPU cores. You will be warned when a limit is close; give your final answer before it is reached.
+GEOS is installed for this task and is the expected way to answer: the value you report must come from the output of a GEOS simulation that you ran. Do not compute it with your own solver, a hand formula or an estimate; you may use scripts only to prepare GEOS inputs and to read GEOS outputs. An answer that does not come from a GEOS run does not count, even if its letter is right. Beyond that you may do anything that helps you answer: read the source and the examples, build and run simulations, write and run scripts, analyse outputs. Your limits: at most {MAX_GEOS_RUNS} GEOS runs in total, {MAX_TURNS} model turns (each tool call is one turn) and about {WALL_HOURS} hours. Commands run on {CORES} CPU cores. You will be warned when a limit is close; give your final answer before it is reached.
 
 Below is one multiple-choice question. Exactly one of the options is the correct answer. Options A, B and C are numerical values; option D, "None of them", means that none of A, B and C is the correct value. Determine the correct option. Base your choice on your own determination of the requested quantity, not on the options.
 
-When you are done, reply without a tool call, with a short summary of how you obtained your answer, and end with these two lines:
+When you are done, reply without a tool call, with a short summary of how you obtained your answer, and end with these three lines:
+GEOS_RUN: <the geosx command whose output gave your value, and the output file you read it from>
 COMPUTED_VALUE: <your own determined number> {UNITS}
 FINAL ANSWER: <one letter A, B, C or D>
 

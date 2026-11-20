@@ -44,6 +44,7 @@ bench/                           BENCH_DIR (default): harness + results
     qa_screen_infer.py           screens the sweep table for infer_then_predict (A, B) pairs in one command
     tests/                       offline mock of the gateway (no API key used)
   _global/scripts/check_mesh_description.py   mesh-description helper used by the controller
+hard_xml_list.txt                coupled-multiphysics decks (INPUT_XML candidates)
 caching_tests/                   standalone prompt-caching tests (no GEOS needed), see below
 example_run/ag1_run5/            a real (stopped) run: transcript + per-call usage showing the caching problem
 ```
@@ -105,6 +106,24 @@ Results are written to `bench/decks/<deck>__<hash>/<RUN_TAG>/` (git-ignored).
 
 ## Status and recent changes
 
+- **First fair KEPT question (2026-11-20, `hydraulicFracturing/walshQuarterNoChombo_smoke.xml`, attempt 2,
+  $7.88 over two days):** the no-tool model was wrong 4/4 (no cut-off), and the agent right 4/4 **with GEOS**
+  (6–29 GEOS runs per shuffle). The generator refined the mesh to 10×30×31 cells. Attempt 1 had failed
+  because the question left out the matrix porosity and permeability; attempt 2 read the agent's answers and
+  fixed it.
+- **GEOS is required** (`AGENT_REQUIRE_GEOS=on`, advisor's rule): a right letter counts only if the session ran
+  GEOS (a wrapper-counted launch or a `geosx ... -i` command); otherwise the outcome is `correct_no_geos`. The
+  agent prompt says the value must come from a GEOS run and asks for a `GEOS_RUN:` line.
+- **Deck choice:** `hard_xml_list.txt` lists 105 coupled-multiphysics decks (poromechanics, fractures, thermal,
+  hydraulic fracturing, induced seismicity) that run in ≤ 30 s. Protocol A4: an internal mesh is refined so
+  that a hand-written solver is impractical, while one GEOS run stays ≤ 3 minutes.
+- **Hard token cap:** `reasoning.max_tokens` is only a target; the top-level `max_tokens` is the hard cap.
+  `finish_reason` is recorded per call. A no-tool reply cut off by `max_tokens` is retried with
+  `NO_TOOL_RETRY_MAX_TOKENS` (40000); if it is still cut off, the outcome is `cut_off`, which is not counted
+  as a no-tool failure.
+- **Gateway limit:** Nemonist refuses a call (HTTP 402) when its worst-case cost (prompt + `max_tokens`) exceeds
+  what is left of the key's limit. The harness saves state and stops; rerun the launcher to resume.
+  `DAILY_BUDGET_USD=0` disables the harness's own daily stop.
 - **First KEPT question (2026-11-17, `ag1_run8`, $1.60 in total):** the no-tool model was wrong 4/4 and the agent
   right 4/4. Note: the agent did not run GEOS. It rebuilt the fully specified 75-node mesh and solved it with its
   own Python finite-element code.

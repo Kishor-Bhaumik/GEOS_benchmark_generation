@@ -75,12 +75,16 @@ def no_tool_shuffle(cfg, adir, mcq, key, question, k):
     usage_p = os.path.join(adir, 'eval', 'no_tool_s%d_usage.jsonl' % k)
     prompt = C.fill(C.prompt_block(cfg['PROTOCOL_FILE'], 'NO_TOOL'), UNITS=key.get('units', ''),
                     QUESTION=question, OPTIONS=options_text(mcq, k))
-    text, letter, calls = '', None, []
+    text, letter, calls, cut = '', None, [], False
     for attempt in (1, 2):
+        # a try cut off by max_tokens (finish_reason "length") is repeated with a larger cap, so that the
+        # no-tool model can finish its reasoning; a shuffle still cut off is `cut_off`, not a no-tool failure
+        mt = int(cfg['NO_TOOL_RETRY_MAX_TOKENS']) if cut else None
         try:
             msg, rec = L.chat(cfg['NO_TOOL_MODEL'], [{'role': 'user', 'content': prompt}], tools=None,
                               timeout=int(cfg['NO_TOOL_TIMEOUT_S']), usage_path=usage_p,
-                              tag={'role': 'no_tool', 'shuffle': k, 'try': attempt}, bench_dir=cfg['BENCH_DIR'])
+                              tag={'role': 'no_tool', 'shuffle': k, 'try': attempt}, bench_dir=cfg['BENCH_DIR'],
+                              max_tokens=mt)
         except (L.UsageLimit, L.BudgetStop) as e:
             usage_stop(cfg, 'B1 shuffle %d' % k, cfg['NO_TOOL_MODEL'], e)
         except L.CallFailed as e:
@@ -88,13 +92,19 @@ def no_tool_shuffle(cfg, adir, mcq, key, question, k):
             continue
         text = AL._text(msg)
         letter = parse_letter(text)
-        calls.append({'try': attempt, 'letter': letter})
+        cut = rec.get('finish_reason') == 'length'
+        calls.append({'try': attempt, 'letter': letter, 'finish_reason': rec.get('finish_reason'),
+                      'max_tokens': mt})
         if letter:
             break
     recs = C.read_jsonl(usage_p)
+    oc = outcome(mcq, k, letter)
+    if not letter and cut:
+        oc = 'cut_off'                   # never finished its answer: not counted as a no-tool failure (B1)
     res = {'shuffle': k, 'question_sha256': mcq['question_sha256'], 'prompt_sha256': C.sha256_text(prompt),
            'answer_text': text, 'computed_value': parse_value(text), 'letter': letter,
-           'outcome': outcome(mcq, k, letter), 'tries': calls, 'usage': C.sum_usage(recs),
+           'outcome': oc, 'tries': calls, 'usage': C.sum_usage(recs),
+           'cut_off': any(r.get('finish_reason') == 'length' for r in recs),
            'model': cfg['NO_TOOL_MODEL']}
     C.save_json(out_p, res)
     print('  no-tool shuffle %d: %-9s (letter %s)  $%.4f' % (k, res['outcome'], letter, res['usage']['actual_cost_usd']))
@@ -144,17 +154,26 @@ def agent_shuffle(cfg, adir, mcq, key, question, k, slug):
     text = (result or {}).get('final_text', '')
     letter = parse_letter(text)
     recs = C.read_jsonl(usage_p)
+    geos_runs = (result or {}).get('geos_runs', geos) or 0
+    geos_inv = (result or {}).get('geos_invocations', 0) or 0
+    used_geos = geos_runs > 0 or geos_inv > 0
+    oc = outcome(mcq, k, letter)
+    if oc == 'correct' and not used_geos and str(cfg.get('AGENT_REQUIRE_GEOS', 'on')).lower() not in ('0', 'off', 'no'):
+        oc = 'correct_no_geos'           # right letter without running GEOS: not counted (Section 10, B2)
     res = {'shuffle': k, 'question_sha256': mcq['question_sha256'], 'prompt_sha256': C.sha256_text(prompt),
            'final_message': text, 'computed_value': parse_value(text), 'letter': letter,
-           'outcome': outcome(mcq, k, letter), 'tries': tries,
+           'outcome': oc, 'tries': tries,
            'turns': (result or {}).get('turns'), 'ended': (result or {}).get('ended', 'technical_failure'),
-           'geos_runs': (result or {}).get('geos_runs', geos),
+           'geos_runs': geos_runs, 'geos_invocations': geos_inv, 'used_geos': used_geos,
+           'geos_run_line': (re.findall(r'GEOS_RUN\s*:\s*(.+)', text) or [None])[-1],
+           'cut_off': any(r.get('finish_reason') == 'length' for r in recs),
            'forbidden_path_attempts': (result or {}).get('forbidden_path_attempts', 0),
            'nemonist_attempts': (result or {}).get('nemonist_attempts', 0),
            'wall_s': (result or {}).get('wall_s'), 'usage': C.sum_usage(recs), 'model': cfg['TOOL_MODEL']}
     C.save_json(out_p, res)
-    print('  agent shuffle %d: %-9s (letter %s) turns %s, GEOS runs %s, %.0f s, $%.4f' % (
-        k, res['outcome'], letter, res['turns'], res['geos_runs'], res['wall_s'] or 0, res['usage']['actual_cost_usd']))
+    print('  agent shuffle %d: %-9s (letter %s) turns %s, GEOS runs %s (commands %s), %.0f s, $%.4f' % (
+        k, res['outcome'], letter, res['turns'], res['geos_runs'], geos_inv, res['wall_s'] or 0,
+        res['usage']['actual_cost_usd']))
     return res
 
 
@@ -225,7 +244,7 @@ def attempt_result(cfg, ddir, n, status, reason=None, key=None, mcq=None, nt=Non
         'question_type': (key or {}).get('question_type'), 'question_sha256': (mcq or {}).get('question_sha256'),
         'true_value': (key or {}).get('true_value'), 'units': (key or {}).get('units'),
         'options': (mcq or {}).get('formatted'), 'band': (mcq or {}).get('band'),
-        'no_tool': {'picks': [x['outcome'] for x in nt], 'failures': sum(1 for x in nt if x['outcome'] != 'correct'),
+        'no_tool': {'picks': [x['outcome'] for x in nt], 'failures': sum(1 for x in nt if x['outcome'] not in ('correct', 'cut_off')),
                     'per_shuffle_cost_usd': nt_cost, 'total_cost_usd': round(sum(nt_cost), 8)},
         'agent': {'picks': [x['outcome'] for x in ag] + ['not_run'] * ((cfg['N_SHUFFLES'] - len(ag)) if ag else 0),
                   'correct': sum(1 for x in ag if x['outcome'] == 'correct'),
@@ -292,7 +311,7 @@ def evaluate(cfg, ddir, n):
     except L.ModelMismatch as e:
         print('STOP: %s' % e)
         return 1
-    fails = sum(1 for x in nt if x['outcome'] != 'correct')
+    fails = sum(1 for x in nt if x['outcome'] not in ('correct', 'cut_off'))
     if fails < int(cfg['NO_TOOL_FAIL_MIN']):
         r = attempt_result(cfg, ddir, n, 'TOO_EASY', key=key, mcq=mcq, nt=nt)
         print('TOO_EASY: no-tool wrong %d/%d (< %d); generator $%.4f, no-tool $%.4f, total $%.4f' % (

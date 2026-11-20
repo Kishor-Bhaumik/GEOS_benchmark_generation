@@ -198,8 +198,11 @@ def _strip_thinking(messages):
 
 
 def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path=None, tag=None,
-         bench_dir=None, reasoning_effort=None, provider=None):
+         bench_dir=None, reasoning_effort=None, provider=None, max_tokens=None):
     """One call. Returns (message, record). Raises UsageLimit or CallFailed.
+
+    max_tokens: the hard cap on thinking + answer for this call (default REASONING_MAX_TOKENS + MAX_ANSWER_TOKENS);
+    reasoning.max_tokens is only a target the model may exceed (advisor's test, 2026-11-18).
 
     provider: pin the call to this provider (no fallbacks), so the signed thinking blocks a session sends
     back are checked by the provider that made them. On a thinking-signature error the earlier thinking
@@ -212,12 +215,14 @@ def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path
         body['tools'] = tools
         if tool_choice:
             body['tool_choice'] = tool_choice
-    # Thinking: Nemonist passes it through for Claude only as reasoning.max_tokens (tested 2026-11-15;
-    # reasoning_effort had no effect). max_tokens must cover the thinking budget plus the visible answer.
+    # Thinking budget as reasoning.max_tokens (a target, not a cap); the top-level max_tokens is the hard cap on
+    # thinking + answer, so it must leave room for the visible answer (finish_reason "length" = cut off).
     budget = int(os.environ.get('REASONING_MAX_TOKENS') or C.DEFAULTS['REASONING_MAX_TOKENS'])
     if budget > 0:
         body['reasoning'] = {'max_tokens': budget}
         body['max_tokens'] = budget + int(os.environ.get('MAX_ANSWER_TOKENS') or C.DEFAULTS['MAX_ANSWER_TOKENS'])
+    if max_tokens:
+        body['max_tokens'] = int(max_tokens)
     eff = reasoning_effort if reasoning_effort is not None else os.environ.get('REASONING_EFFORT')
     if eff and budget <= 0:
         body['reasoning_effort'] = eff
@@ -333,6 +338,7 @@ def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path
         'cost_mismatch': bool(compare and rate and abs(compare - rate) > 0.02 * max(compare, rate)),
         'wall_s': round(wall, 2), 'retried': attempt == 2, 'cache_control': use_cache,
         'provider_pinned': body.get('provider', {}).get('order', [None])[0], 'repairs': fixes,
+        'finish_reason': (resp.get('choices') or [{}])[0].get('finish_reason'),
         'repair_errors': [_redact(x) for x in fix_errors],
     }
     if tag:
@@ -342,6 +348,8 @@ def chat(model, messages, tools=None, tool_choice=None, timeout=1800, usage_path
     if bench:
         C.append_jsonl(C.ledger_path(bench), {'ts': rec['ts'], 'day': C.today_local(), 'model': model,
                                               'cost_usd': rec['cost_usd'], 'role': (tag or {}).get('role')})
+    if rec['finish_reason'] == 'length':
+        print('WARNING: %s call cut off by max_tokens (finish_reason "length")' % ((tag or {}).get('role') or 'model'))
     if not _model_ok(model, resp.get('model')):
         raise ModelMismatch('model mismatch: requested %s, reported %s' % (model, resp.get('model')))
     msg = resp['choices'][0].get('message') or {}
